@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CUnleash Custom Version
 // @namespace    http://tampermonkey.net/
-// @version      7.4.2-C
+// @version      7.4.3-C
 // @description  Unleash your cookie potential.
 // @author       petar105, n0eL1405
 // @match        https://orteil.dashnet.org/cookieclicker/
