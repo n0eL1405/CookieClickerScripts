@@ -124,317 +124,6 @@ let stockerModeProfits = [
 var modeDecoder = ['stable', 'slowly rising', 'slowly falling', 'rapidly rising', 'rapidly falling', 'chaotic'] // meanings of each market trend (good.mode)
 var goodIcons = [[2, 33], [3, 33], [4, 33], [15, 33], [16, 33], [17, 33], [5, 33], [6, 33], [7, 33], [8, 33], [13, 33], [14, 33], [19, 33], [20, 33], [32, 33], [33, 33], [34, 33], [35, 33]];
 
-CookiStocker.DataStats = function (id, value, dollars) {
-    let it = l(id);
-    it.innerHTML = (value < 0 ? "-" : "") + (dollars ? '$' : '') + Beautify(Math.abs(value), 0);
-    if (id === "Brokers" && CookiStocker.Bank.brokers < stockerMinBrokers)
-        value = -1;
-    else if (id === "bankedCookies") {
-        if (Game.cookies > stockList.minCookies && Game.cookies < stockList.maxCookies) {
-            it.classList.remove("green");
-            it.style.color = 'yellow';
-            return;
-        } else if (Game.cookies < stockList.minCookies)
-            value = -1;
-    }
-    if (value > 0) {
-        it.classList.add("green");
-        it.style.color = '';
-    } else if (value < 0) {
-        it.classList.remove("green");
-        it.classList.remove("yellow");
-        it.style.color = '#ff3b3b';
-    }
-}
-
-CookiStocker.TradingStats = function () {
-    if (typeof CookiStocker.Bank === 'undefined')
-        return;
-
-    let i, shares, cookies;
-    let now = Date.now();
-    let market = CookiStocker.Bank.goodsById;
-
-    if (now > stockList.lastTime + stockerActivityReportFrequency + 500) {		// Were we sleeping?
-        stockList.Start += now - stockList.lastTime - stockerActivityReportFrequency;
-    }
-
-    stockList.totalStocks = 0;
-    stockList.totalShares = 0;
-    stockList.totalValue = 0;
-    stockList.unrealizedProfits = 0;
-    for (i = 0; i < market.length; i++) {
-        if (stockList.Goods[i].stock) {
-            stockList.totalStocks++;
-            stockList.totalShares += stockList.Goods[i].stock;
-            stockList.totalValue += stockList.Goods[i].stock * stockList.Goods[i].currentPrice;
-            stockList.unrealizedProfits += (market[i].val - market[i].prev) * stockList.Goods[i].stock;
-        }
-    }
-    stockList.minCookies = Number.MAX_VALUE;
-    stockList.maxCookies = 0;
-    for (i = 0; i < market.length; i++) {
-        shares = CookiStocker.Bank.getGoodMaxStock(market[i]) - market[i].stock;
-        cookies = shares * Game.cookiesPsRawHighest * market[i].val / stockerCookiesThreshold;
-        if (!stockList.minCookies || shares && cookies < stockList.minCookies)
-            stockList.minCookies = cookies;
-        if (shares && cookies > stockList.maxCookies)
-            stockList.maxCookies = cookies;
-    }
-    CookiStocker.DataStats("Brokers", CookiStocker.Bank.brokers, 0);
-    CookiStocker.DataStats("brokersNeeded", stockerMinBrokers, 0);
-    CookiStocker.DataStats("bankedCookies", Game.cookies, 0);
-    CookiStocker.DataStats("minCookies", stockList.minCookies, 0);
-    CookiStocker.DataStats("maxCookies", stockList.maxCookies, 0);
-    CookiStocker.DataStats("Profits", stockList.netProfits, 1);
-    CookiStocker.DataStats("profitsHour", stockList.hourlyProfits, 1);
-    CookiStocker.DataStats("profitsDay", stockList.dailyProfits, 1);
-    CookiStocker.DataStats("grossProfits", stockList.grossProfits, 1);
-    CookiStocker.DataStats("grossLosses", -stockList.grossLosses, 1);
-    stockList.lastTime = now;
-    stockList.Uptime = Math.floor((now - stockList.Start) / 1000) * 1000;
-    stockList.Uptime -= stockList.Uptime % stockerLoopFrequency;
-    let uptimeHours = Math.floor(stockList.Uptime / 3600000);
-    let uptimeDays = Math.floor(uptimeHours / 24);
-    if (uptimeDays >= 1) {
-        uptimeDays += ':';
-        uptimeHours %= 24;
-        if (uptimeHours < 10)
-            uptimeHours = '0' + uptimeHours;
-    } else
-        uptimeDays = '';
-    let it = l("runTime");
-    it.innerHTML = uptimeDays + uptimeHours + ':';
-    if (stockerForceLoopUpdates) {
-        it.innerHTML += new Date(stockList.Uptime).toLocaleTimeString([], {minute: '2-digit', second: '2-digit'});
-    } else {
-        let uptimeMinutes = (Math.floor(stockList.Uptime / 60000)) % 60;
-        it.innerHTML += (uptimeMinutes < 10 ? '0' : '') + uptimeMinutes;
-    }
-    if (stockerAdditionalTradingStats) {
-        CookiStocker.DataStats("netCookies", stockList.netProfits * Game.cookiesPsRawHighest, 0);
-        CookiStocker.DataStats("cookiesHour", stockList.hourlyProfits * Game.cookiesPsRawHighest, 0);
-        CookiStocker.DataStats("cookiesDay", stockList.dailyProfits * Game.cookiesPsRawHighest, 0);
-        l("Purchases").innerHTML = stockList.Purchases;
-        l("Sales").innerHTML = stockList.Sales;
-        l("cpsMultiple").innerHTML = stockList.hourlyProfits >= 0 ? Beautify(stockList.hourlyProfits / 3600, 3) : -Beautify(-stockList.hourlyProfits / 3600, 3);
-        l("stocksHeld").innerHTML = stockList.totalStocks;
-        l("totalShares").innerHTML = Beautify(stockList.totalShares);
-        CookiStocker.DataStats("totalValue", stockList.totalValue, 1);
-        CookiStocker.DataStats("unrealizedProfits", stockList.unrealizedProfits, 1);
-        l("profitableStocks").innerHTML = stockList.profitableStocks;
-        l("unprofitableStocks").innerHTML = stockList.unprofitableStocks
-        l("profitableTrades").innerHTML = stockList.profitableTrades;
-        l("unprofitableTrades").innerHTML = stockList.unprofitableTrades;
-        CookiStocker.DataStats("averageProfit", stockList.profitableTrades ? stockList.grossProfits / stockList.profitableTrades : 0, 1);
-        CookiStocker.DataStats("averageLoss", stockList.unprofitableTrades ? -stockList.grossLosses / stockList.unprofitableTrades : 0, 1);
-    }
-    if (it.innerHTML == '')
-        it.innerHTML = "0:00";
-    CookiStocker.updateWarn();
-}
-
-CookiStocker.ReplaceGameMenu = function () {
-    Game.customOptionsMenu.push(function () {
-        // Build a real node from the HTML string
-        const content = document.createElement('div');
-        content.innerHTML = CookiStocker.getMenuString();
-
-        // CCSE expects a Node here, not a string
-        CCSE.AppendCollapsibleOptionsMenu(CookiStocker.name, content);
-    });
-
-    Game.customStatsMenu.push(function () {
-        CCSE.AppendStatsVersionNumber(CookiStocker.name, CookiStocker.version);
-        if (!CookiStocker.Bank || !CookiStocker.Bank.goodsById) return;
-
-        // example rollup; adjust to taste
-        var p = CookiStocker.Bank.profit;
-        var held = CookiStocker.Bank.goodsById.reduce((a, g) => a + g.stock, 0);
-        var worth = CookiStocker.Bank.goodsById.reduce((a, g) => a + g.stock * g.val * Game.cookiesPsRawHighest, 0);
-
-        CCSE.AppendStatsGeneral('<div class="listing"><b>Stock Market has earned you :</b><div class="price plain"> $' + Beautify(p) + ' (' + Game.tinyCookie() + Beautify(p * Game.cookiesPsRawHighest) + ' cookies)</div></div>');
-        /*		CCSE.AppendStatsGeneral(
-                    '<div class="listing"><b>CookiStocker</b></div>'
-                    + '<div class="listing">Net profits: <b>$' + Beautify(p, 2) + '</b></div>'
-                    + '<div class="listing">Total shares held: <b>' + Beautify(held) + '</b></div>'
-                    + '<div class="listing">Portfolio (at current prices): <b>$' + Beautify(worth,2) + '</b></div>'
-                );
-        */
-    });
-}
-
-CookiStocker.save = function () {
-    var str = '';
-
-    if (typeof CookiStocker.Bank === 'undefined')
-        return '';
-    let market = CookiStocker.Bank.goodsById;
-    str += Number(stockList.Check);
-    for (let i = 0; i < market.length; i++) {
-        str += '_' + encodeURIComponent(stockList.Goods[i].name);
-        str += '_' + Number(stockList.Goods[i].stock);
-        str += '_' + Number(stockList.Goods[i].val);
-        str += '_' + Number(stockList.Goods[i].currentPrice);
-        str += '_' + Number(stockList.Goods[i].mode);
-        str += '_' + Number(stockList.Goods[i].lastMode);
-        str += '_' + Number(stockList.Goods[i].lastDur);
-        str += '_' + Number(stockList.Goods[i].unchangedDur);
-        str += '_' + Number(stockList.Goods[i].dropCount);
-        str += '_' + Number(stockList.Goods[i].riseCount);
-        str += '_' + Number(stockList.Goods[i].profit);
-        str += '_' + (+!!stockList.Goods[i].someSold);
-        str += '_' + (+!!stockList.Goods[i].someBought);
-    }
-    str += '_' + Number(stockList.Start);
-    str += '_' + Number(stockList.lastTime);
-    str += '_' + Number(stockList.startingProfits);
-    str += '_' + Number(stockList.Profits);
-    str += '_' + Number(stockList.netProfits);
-    str += '_' + Number(stockList.grossProfits);
-    str += '_' + Number(stockList.grossLosses);
-    str += '_' + Number(stockList.totalStocks);
-    str += '_' + Number(stockList.totalShares);
-    str += '_' + Number(stockList.totalValue);
-    str += '_' + Number(stockList.unrealizedProfits);
-    str += '_' + Number(stockList.profitableStocks);
-    str += '_' + Number(stockList.unprofitableStocks);
-    str += '_' + Number(stockList.profitableTrades);
-    str += '_' + Number(stockList.unprofitableTrades);
-    str += '_' + Number(stockList.Purchases);
-    str += '_' + Number(stockList.Sales);
-    str += '_' + Number(stockList.Uptime);
-    str += '_' + Number(stockList.hourlyProfits);
-    str += '_' + Number(stockList.dailyProfits);
-    str += '_' + Number(stockList.minCookies);
-    str += '_' + Number(stockList.maxCookies);
-    str += '_' + (+!!stockList.noModActions);
-    str += '_' + Number(stockList.origCookiesPsRawHighest);
-    for (i = 0; i < stockerModeProfits.length; i++)
-        for (j = 0; j < stockerModeProfits[i].length; j++)
-            for (k = 0; k < stockerModeProfits[i][j].length; k++)
-                str += '_' + Number(stockerModeProfits[i][j][k]);
-    str += '_' + Number(Game.Achievements['Plasmic assets'].won);
-    str += '_' + Number(Game.Achievements['Bose-Einstein Condensed Assets'].won);
-// Append options tail (backward‑compatible)
-    const cfg = {
-        stockerAutoTrading,
-        stockerMinBrokers,
-        stockerAutoBuyMinimumBrokers,
-        stockerTransactionNotifications,
-        stockerActivityReport,
-        stockerActivityReportFrequency,
-        stockerFastNotifications,
-        stockerConsoleAnnouncements,
-        stockerAdditionalTradingStats,
-        stockerLoopFrequency,
-        stockerForceLoopUpdates,
-        stockerCookiesThreshold,
-        stockerResourcesWarning,
-        stockerMarketOn,
-        stockerExponential,
-        stockerExponentialPower,
-        stockerAutoBuyAdditionalBrokers,
-    };
-    str += '|CFG:' + JSON.stringify(cfg);
-    return str;
-}
-
-CookiStocker.load = function (str) {
-    let i = 0;
-    let j, k, m;
-
-    if (typeof CookiStocker.Bank === 'undefined' || !str || !(stockList.Goods[0].name.length > 0))
-        return false;
-
-    // --- strip optional config tail BEFORE underscore parsing (prevents token contamination) ---
-    let cfg = null;
-    let cfgIdx = (str || '').indexOf('|CFG:');
-    if (cfgIdx > -1) {
-        try {
-            cfg = JSON.parse(str.slice(cfgIdx + 5));
-        } catch (e) {
-            cfg = null;
-        }
-        str = str.slice(0, cfgIdx);
-    }
-
-    // Now split clean payload
-    let spl = str.split('_');
-
-    let market = CookiStocker.Bank.goodsById;
-
-    // Legacy sharesThreshold captured (used as a fallback for threshold migration)
-    let __legacyShares = NaN;
-
-    stockList.Check = Number(spl[i++] || 0);
-
-    // Goods block
-    for (j = 0; j < market.length; j++) {
-        // Older saves wrote NaN for names; if so, fall back to live name
-        var tok = (spl[i++] || '');
-        var nm;
-        try {
-            nm = decodeURIComponent(tok);
-        } catch (e) {
-            nm = tok;
-        }
-        if (!nm || nm === 'NaN') nm = market[j].name;
-        stockList.Goods[j].name = nm;
-
-        stockList.Goods[j].stock = Number(spl[i++] || 0);
-        stockList.Goods[j].val = Number(spl[i++] || 0);
-        stockList.Goods[j].currentPrice = Number(spl[i++] || 0);
-        stockList.Goods[j].mode = Number(spl[i++] || 0);
-        stockList.Goods[j].lastMode = Number(spl[i++] || 0);
-        stockList.Goods[j].lastDur = Number(spl[i++] || 0);
-        stockList.Goods[j].unchangedDur = Number(spl[i++] || 0);
-        stockList.Goods[j].dropCount = Number(spl[i++] || 0);
-        stockList.Goods[j].riseCount = Number(spl[i++] || 0);
-        stockList.Goods[j].profit = Number(spl[i++] || 0);
-        stockList.Goods[j].someSold = !!(+spl[i++] || 0);
-        stockList.Goods[j].someBought = !!(+spl[i++] || 0);
-    }
-
-CookiStocker.updateWarn = function () {
-    let warn = l('stockerWarnLine');
-    let warn2 = l('stockerWarnLine2');
-    let warn3 = l('stockerWarnLine3');
-
-    // Hide all first
-    if (warn) warn.style.display = 'none';
-    if (warn2) warn2.style.display = 'none';
-    if (warn3) warn3.style.display = 'none';
-    if (!stockerResourcesWarning) {
-        return;
-    }
-    warn3 = l('stockerWarnLine3');
-    if (warn3 && !stockerMarketOn) {
-        warn3.style.display = '';
-        return;
-    }
-    warn2 = l('stockerWarnLine2');
-    if (warn2 && !stockerAutoTrading) {
-        warn2.style.display = '';
-        return;
-    }
-    warn = l('stockerWarnLine');
-    if (!warn) return;
-
-    // Insufficient if we’re short on brokers or short on banked cookies for a full lot
-    if (CookiStocker.Bank.brokers < stockerMinBrokers) {
-        warn.style.display = '';
-        return;
-    }
-    let market = CookiStocker.Bank.goodsById;	// update market
-    for (let i = 0; i < market.length; i++)
-        if ((CookiStocker.Bank.getGoodMaxStock(market[i]) - market[i].stock) * Game.cookiesPsRawHighest * market[i].val >= Game.cookies * stockerCookiesThreshold) {
-            warn.style.display = '';
-            return;
-        }
-    warn.style.display = 'none';
-};
-
 CookiStocker.launch = function () {
     try {
         if (Game && Game.Objects && Game.Objects['Bank'] && Game.Objects['Bank'].minigame) {
@@ -584,6 +273,215 @@ function stockerTimeBeautifier(duration) {
         return (strSeconds);
 }
 
+CookiStocker.DataStats = function (id, value, dollars) {
+    let it = l(id);
+    it.innerHTML = (value < 0 ? "-" : "") + (dollars ? '$' : '') + Beautify(Math.abs(value), 0);
+    if (id === "Brokers" && CookiStocker.Bank.brokers < stockerMinBrokers)
+        value = -1;
+    else if (id === "bankedCookies") {
+        if (Game.cookies > stockList.minCookies && Game.cookies < stockList.maxCookies) {
+            it.classList.remove("green");
+            it.style.color = 'yellow';
+            return;
+        } else if (Game.cookies < stockList.minCookies)
+            value = -1;
+    }
+    if (value > 0) {
+        it.classList.add("green");
+        it.style.color = '';
+    } else if (value < 0) {
+        it.classList.remove("green");
+        it.classList.remove("yellow");
+        it.style.color = '#ff3b3b';
+    }
+}
+
+CookiStocker.updateWarn = function () {
+    let warn = l('stockerWarnLine');
+    let warn2 = l('stockerWarnLine2');
+    let warn3 = l('stockerWarnLine3');
+
+    // Hide all first
+    if (warn) warn.style.display = 'none';
+    if (warn2) warn2.style.display = 'none';
+    if (warn3) warn3.style.display = 'none';
+    if (!stockerResourcesWarning) {
+        return;
+    }
+    warn3 = l('stockerWarnLine3');
+    if (warn3 && !stockerMarketOn) {
+        warn3.style.display = '';
+        return;
+    }
+    warn2 = l('stockerWarnLine2');
+    if (warn2 && !stockerAutoTrading) {
+        warn2.style.display = '';
+        return;
+    }
+    warn = l('stockerWarnLine');
+    if (!warn) return;
+
+    // Insufficient if we’re short on brokers or short on banked cookies for a full lot
+    if (CookiStocker.Bank.brokers < stockerMinBrokers) {
+        warn.style.display = '';
+        return;
+    }
+    let market = CookiStocker.Bank.goodsById;	// update market
+    for (let i = 0; i < market.length; i++)
+        if ((CookiStocker.Bank.getGoodMaxStock(market[i]) - market[i].stock) * Game.cookiesPsRawHighest * market[i].val >= Game.cookies * stockerCookiesThreshold) {
+            warn.style.display = '';
+            return;
+        }
+    warn.style.display = 'none';
+};
+
+CookiStocker.TradingStats = function () {
+    if (typeof CookiStocker.Bank === 'undefined')
+        return;
+
+    let i, shares, cookies;
+    let now = Date.now();
+    let market = CookiStocker.Bank.goodsById;
+
+    if (now > stockList.lastTime + stockerActivityReportFrequency + 500) {		// Were we sleeping?
+        stockList.Start += now - stockList.lastTime - stockerActivityReportFrequency;
+    }
+
+    stockList.totalStocks = 0;
+    stockList.totalShares = 0;
+    stockList.totalValue = 0;
+    stockList.unrealizedProfits = 0;
+    for (i = 0; i < market.length; i++) {
+        if (stockList.Goods[i].stock) {
+            stockList.totalStocks++;
+            stockList.totalShares += stockList.Goods[i].stock;
+            stockList.totalValue += stockList.Goods[i].stock * stockList.Goods[i].currentPrice;
+            stockList.unrealizedProfits += (market[i].val - market[i].prev) * stockList.Goods[i].stock;
+        }
+    }
+    stockList.minCookies = Number.MAX_VALUE;
+    stockList.maxCookies = 0;
+    for (i = 0; i < market.length; i++) {
+        shares = CookiStocker.Bank.getGoodMaxStock(market[i]) - market[i].stock;
+        cookies = shares * Game.cookiesPsRawHighest * market[i].val / stockerCookiesThreshold;
+        if (!stockList.minCookies || shares && cookies < stockList.minCookies)
+            stockList.minCookies = cookies;
+        if (shares && cookies > stockList.maxCookies)
+            stockList.maxCookies = cookies;
+    }
+    CookiStocker.DataStats("Brokers", CookiStocker.Bank.brokers, 0);
+    CookiStocker.DataStats("brokersNeeded", stockerMinBrokers, 0);
+    CookiStocker.DataStats("bankedCookies", Game.cookies, 0);
+    CookiStocker.DataStats("minCookies", stockList.minCookies, 0);
+    CookiStocker.DataStats("maxCookies", stockList.maxCookies, 0);
+    CookiStocker.DataStats("Profits", stockList.netProfits, 1);
+    CookiStocker.DataStats("profitsHour", stockList.hourlyProfits, 1);
+    CookiStocker.DataStats("profitsDay", stockList.dailyProfits, 1);
+    CookiStocker.DataStats("grossProfits", stockList.grossProfits, 1);
+    CookiStocker.DataStats("grossLosses", -stockList.grossLosses, 1);
+    stockList.lastTime = now;
+    stockList.Uptime = Math.floor((now - stockList.Start) / 1000) * 1000;
+    stockList.Uptime -= stockList.Uptime % stockerLoopFrequency;
+    let uptimeHours = Math.floor(stockList.Uptime / 3600000);
+    let uptimeDays = Math.floor(uptimeHours / 24);
+    if (uptimeDays >= 1) {
+        uptimeDays += ':';
+        uptimeHours %= 24;
+        if (uptimeHours < 10)
+            uptimeHours = '0' + uptimeHours;
+    } else
+        uptimeDays = '';
+    let it = l("runTime");
+    it.innerHTML = uptimeDays + uptimeHours + ':';
+    if (stockerForceLoopUpdates) {
+        it.innerHTML += new Date(stockList.Uptime).toLocaleTimeString([], {minute: '2-digit', second: '2-digit'});
+    } else {
+        let uptimeMinutes = (Math.floor(stockList.Uptime / 60000)) % 60;
+        it.innerHTML += (uptimeMinutes < 10 ? '0' : '') + uptimeMinutes;
+    }
+    if (stockerAdditionalTradingStats) {
+        CookiStocker.DataStats("netCookies", stockList.netProfits * Game.cookiesPsRawHighest, 0);
+        CookiStocker.DataStats("cookiesHour", stockList.hourlyProfits * Game.cookiesPsRawHighest, 0);
+        CookiStocker.DataStats("cookiesDay", stockList.dailyProfits * Game.cookiesPsRawHighest, 0);
+        l("Purchases").innerHTML = stockList.Purchases;
+        l("Sales").innerHTML = stockList.Sales;
+        l("cpsMultiple").innerHTML = stockList.hourlyProfits >= 0 ? Beautify(stockList.hourlyProfits / 3600, 3) : -Beautify(-stockList.hourlyProfits / 3600, 3);
+        l("stocksHeld").innerHTML = stockList.totalStocks;
+        l("totalShares").innerHTML = Beautify(stockList.totalShares);
+        CookiStocker.DataStats("totalValue", stockList.totalValue, 1);
+        CookiStocker.DataStats("unrealizedProfits", stockList.unrealizedProfits, 1);
+        l("profitableStocks").innerHTML = stockList.profitableStocks;
+        l("unprofitableStocks").innerHTML = stockList.unprofitableStocks
+        l("profitableTrades").innerHTML = stockList.profitableTrades;
+        l("unprofitableTrades").innerHTML = stockList.unprofitableTrades;
+        CookiStocker.DataStats("averageProfit", stockList.profitableTrades ? stockList.grossProfits / stockList.profitableTrades : 0, 1);
+        CookiStocker.DataStats("averageLoss", stockList.unprofitableTrades ? -stockList.grossLosses / stockList.unprofitableTrades : 0, 1);
+    }
+    if (it.innerHTML == '')
+        it.innerHTML = "0:00";
+    CookiStocker.updateWarn();
+}
+
+CookiStocker.ReplaceGameMenu = function () {
+    Game.customOptionsMenu.push(function () {
+        // Build a real node from the HTML string
+        const content = document.createElement('div');
+        content.innerHTML = CookiStocker.getMenuString();
+
+        // CCSE expects a Node here, not a string
+        CCSE.AppendCollapsibleOptionsMenu(CookiStocker.name, content);
+    });
+
+    Game.customStatsMenu.push(function () {
+        CCSE.AppendStatsVersionNumber(CookiStocker.name, CookiStocker.version);
+        if (!CookiStocker.Bank || !CookiStocker.Bank.goodsById) return;
+
+        // example rollup; adjust to taste
+        var p = CookiStocker.Bank.profit;
+        var held = CookiStocker.Bank.goodsById.reduce((a, g) => a + g.stock, 0);
+        var worth = CookiStocker.Bank.goodsById.reduce((a, g) => a + g.stock * g.val * Game.cookiesPsRawHighest, 0);
+
+        CCSE.AppendStatsGeneral('<div class="listing"><b>Stock Market has earned you :</b><div class="price plain"> $' + Beautify(p) + ' (' + Game.tinyCookie() + Beautify(p * Game.cookiesPsRawHighest) + ' cookies)</div></div>');
+        /*		CCSE.AppendStatsGeneral(
+                    '<div class="listing"><b>CookiStocker</b></div>'
+                    + '<div class="listing">Net profits: <b>$' + Beautify(p, 2) + '</b></div>'
+                    + '<div class="listing">Total shares held: <b>' + Beautify(held) + '</b></div>'
+                    + '<div class="listing">Portfolio (at current prices): <b>$' + Beautify(worth,2) + '</b></div>'
+                );
+        */
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // --- Anchored scheduling on each market tick ------------------------------
 CookiStocker._tickHookInstalled = 0;
 CookiStocker._tickTimeout = 0;
@@ -690,6 +588,801 @@ CookiStocker.ensureAchievements = function () {
     CookiStocker.AchBoseEinstein.pool = 'shadow';
     CookiStocker.AchBoseEinstein.order = 1003101;
 };
+
+CookiStocker.Reports = function () {
+    if (l("Brokers") == null || !stockList.Amount || !stockList.canBuy)
+        return;				// Stock market went away
+    CookiStocker.TradingStats();
+    if (stockList.noModActions || !stockerActivityReport && !stockerConsoleAnnouncements)
+        return;
+    let stockerNotificationTime = stockerFastNotifications * 6;
+
+    if (stockerActivityReport)
+        if ((stockList.Purchases + stockList.Sales) == 0) {
+            Game.Notify(
+                `CookiStocker report ${new Date().toLocaleTimeString([], {
+                    hourCycle: 'h23',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })}`,
+                `This session has been running for ${stockerTimeBeautifier(stockList.Uptime)}, but no good investment opportunities were detected! Luck is not on our side, yet.`
+                , [1, 33], stockerNotificationTime
+            );
+        } else {
+            Game.Notify(
+                `CookiStocker report ${new Date().toLocaleTimeString([], {
+                    hourCycle: 'h23',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })}`,
+                `This session has been running for ${stockerTimeBeautifier(stockList.Uptime)} and has made $${Beautify(stockList.netProfits, 0)} in net profits and $${Beautify(stockList.Profits, 0)} in revenue (displayed profits) in ${Beautify(stockList.Purchases, 0)} purchases and ${Beautify(stockList.Sales, 0)} sales.`, [1, 33], stockerNotificationTime
+            );
+        }
+    if (stockerConsoleAnnouncements) {
+        let totalProfits = 0;
+        let subtotalProfits = 0;
+        let deltaTotalProfits = 0;
+        let deltaSubtotalProfits = 0;
+        let totalTrades = 0;
+        let subtotalTrades = 0;
+        let profit = 0;
+        let lastProfit = 0;
+        let trades = 0;
+        let strProfit = '';
+        let strDeltaModeProfits = '';
+        let strTrades = '';
+        let j, k;
+
+        console.log(`Running for ${stockerTimeBeautifier(stockList.Uptime)} and made $${Beautify(stockList.netProfits, 0)}\n  in net profits and $${Beautify(stockList.Profits, 0)} in revenue (displayed profits)\n  in ${Beautify(stockList.Purchases, 0)} purchases and ${Beautify(stockList.Sales, 0)} sales.\nTotal number of stocks held: ${stockList.totalStocks}.  Total shares: ${Beautify(stockList.totalShares, 0)}.\nTotal value: $${Beautify(stockList.totalValue)}.  Unrealized profits: $${Beautify(stockList.unrealizedProfits, 2)}.\nTotal gross profits:  $${Beautify(stockList.grossProfits, 0)}.  Profitable stocks:  ${stockList.profitableStocks}.\nProfitable trades:  ${stockList.profitableTrades}.  Average profit per trade:  $${stockList.grossProfits ? Beautify(stockList.grossProfits / stockList.profitableTrades, 2) : 0}.\nTotal gross losses:  $${Beautify(stockList.grossLosses, 0)}.  Unprofitable stocks:  ${stockList.unprofitableStocks}.\nUnprofitable trades:  ${stockList.unprofitableTrades}.  Average loss per trade:  $${stockList.grossLosses ? Beautify(stockList.grossLosses / stockList.unprofitableTrades, 2) : 0}.`);
+
+        // Stats for individual modes
+        for (j = 0; j < 6; j++)
+            for (k = 0; k < 6; k++)
+                totalProfits += stockerModeProfits[j][k][0];
+        for (j = 0; j < 6; j++)
+            for (k = 0; k < 6; k++) {
+                profit = stockerModeProfits[j][k][0];
+                lastProfit = stockerModeProfits[j][k][1];
+                trades = stockerModeProfits[j][k][2];
+                strProfit = profit ? ((100 * profit / totalProfits).toFixed(2) + '%').padStart(8) : '';
+                strDeltaModeProfits = (lastProfit ? '$' + Beautify(lastProfit, 2) : '').padStart(14);
+                strTrades = trades ? (' ' + trades + ' trade' + (trades > 1 ? 's' : ' ')).padStart(13) : '';
+
+                console.log(`Profits[${j}][${k}] = $${Beautify(profit, 2).padEnd(14)} ${strProfit}${strDeltaModeProfits}${strTrades}`);
+                subtotalProfits += profit;
+                deltaSubtotalProfits += lastProfit;
+                deltaTotalProfits += lastProfit;
+                subtotalTrades += trades;
+                totalTrades += trades;
+            }
+
+        // Stats for subtotals
+        for (j = 0; j < 6; j++) {
+            subtotalProfits = 0;
+            deltaSubtotalProfits = 0;
+            subtotalTrades = 0;
+            for (k = 0; k < 6; k++) {
+                subtotalProfits += stockerModeProfits[j][k][0];
+                deltaSubtotalProfits += stockerModeProfits[j][k][1];
+                subtotalTrades += stockerModeProfits[j][k][2];
+                stockerModeProfits[j][k][1] = 0;
+            }
+            strProfit = subtotalProfits ? ((100 * subtotalProfits / totalProfits).toFixed(2) + '%').padStart(8) : '';
+            strDeltaModeProfits = (deltaSubtotalProfits ? '$' + Beautify(deltaSubtotalProfits, 2) : '').padStart(14);
+            strTrades = subtotalTrades ? (' ' + subtotalTrades + ' trade' + (subtotalTrades > 1 ? 's' : ' ')).padStart(13) : '';
+
+            console.log(`Subtotal[${j}]`.padEnd(14) + `= $${Beautify(subtotalProfits, 2).padEnd(14)} ${strProfit}${strDeltaModeProfits}${strTrades}`);
+            subtotalProfits = 0;
+            deltaSubtotalProfits = 0;
+            subtotalTrades = 0;
+        }
+
+        // Stats for totals
+        stockList.hourlyProfits = totalProfits * (stockerLoopFrequency / 60_000) * 3600_000 / (stockList.Uptime + 1);
+        stockList.dailyProfits = totalProfits * (stockerLoopFrequency / 60_000) * 86_400_000 / (stockList.Uptime + 1);
+
+        if (!stockerForceLoopUpdates) {
+            stockList.hourlyProfits *= 2;
+            stockList.dailyProfits *= 2;
+        }
+        console.log(`Total profits = $${Beautify(totalProfits, 2).padEnd(22)}${(deltaTotalProfits ? '$' + Beautify(deltaTotalProfits, 2) : '').padStart(15)}${totalTrades ? (' ' + totalTrades + ' trade' + (totalTrades > 1 ? 's' : ' ')).padStart(13) : ''}`);
+        console.log(`Profit per hour = $${Beautify(stockList.hourlyProfits, 2)}; profit per day = $${Beautify(stockList.dailyProfits, 2)}`);
+        console.log(`That's ${Beautify(stockList.hourlyProfits * Game.cookiesPsRawHighest, 2)} cookies and ${Beautify(stockList.dailyProfits * Game.cookiesPsRawHighest, 2)} cookies, respectively. It's also ${Beautify((stockList.hourlyProfits / 3600), 0)} times your highest raw cookie production rate.`);
+        if (stockerForceLoopUpdates) {
+            console.log('In unadjusted, true numbers:');
+            stockList.hourlyProfits *= 60_000 / stockerLoopFrequency;
+            stockList.dailyProfits *= 60_000 / stockerLoopFrequency;
+            console.log(`Profit per hour = $${Beautify(stockList.hourlyProfits, 2)}; profit per diem = $${Beautify(stockList.dailyProfits, 2)}`);
+            console.log(`That's ${Beautify(stockList.hourlyProfits * Game.cookiesPsRawHighest, 2)} cookies and ${Beautify(stockList.dailyProfits * Game.cookiesPsRawHighest, 2)} cookies, respectively. It's also ${Beautify((stockList.hourlyProfits / 3600), 0)} times your highest raw cookie production rate.`);
+        }
+        console.log('------------------------------------------------------------------');
+    }
+};
+
+// ===== CookiStocker options UI & persistence =====
+
+/** Mirror of boolean prefs for CCSE.ToggleButton to read/write.
+ We keep the *real* vars exactly where they are (top of file); we just sync them here. */
+CookiStocker.state = {
+    stockerAutoTrading: +!!stockerAutoTrading,
+    stockerMarketOn: +!!stockerMarketOn,
+    stockerAutoBuyMinimumBrokers: +!!stockerAutoBuyMinimumBrokers,
+    stockerResourcesWarning: +!!stockerResourcesWarning,
+    stockerExponential: +!!stockerExponential,
+    stockerTransactionNotifications: +!!stockerTransactionNotifications,
+    stockerActivityReport: +!!stockerActivityReport,
+    stockerFastNotifications: +!!stockerFastNotifications,
+    stockerConsoleAnnouncements: +!!stockerConsoleAnnouncements,
+    stockerAdditionalTradingStats: +!!stockerAdditionalTradingStats,
+    stockerForceLoopUpdates: +!!stockerForceLoopUpdates,
+    stockerAutoBuyAdditionalBrokers: +!!stockerAutoBuyAdditionalBrokers,
+};
+
+// Toggle handler (signature matches CCSE.MenuHelper.ToggleButton)
+CookiStocker.Toggle = function (prefName, button, on, off, invert) {
+    // Flip state bit
+    CookiStocker.state[prefName] = CookiStocker.state[prefName] ? 0 : 1;
+
+    // Update button text/class
+    l(button).innerHTML = CookiStocker.state[prefName] ? on : off;
+    l(button).className = 'smallFancyButton prefButton option' + ((CookiStocker.state[prefName] ^ invert) ? '' : ' off');
+
+    // Write through to the *real* globals
+    switch (prefName) {
+        case 'stockerAutoTrading':
+            stockerAutoTrading = !!CookiStocker.state[prefName];
+            CookiStocker.updateWarn();
+            break;
+        case 'stockerMarketOn':
+            stockerMarketOn = !!CookiStocker.state[prefName];
+            CookiStocker.updateWarn();
+            CookiStocker.ensureReportTimer();
+            break;
+        case 'stockerAutoBuyMinimumBrokers':
+            stockerAutoBuyMinimumBrokers = !!CookiStocker.state[prefName];
+            CookiStocker.TradingStats();
+            break;
+        case 'stockerAutoBuyAdditionalBrokers':
+            stockerAutoBuyAdditionalBrokers = !!CookiStocker.state[prefName];
+            CookiStocker.TradingStats();
+            break;
+        case 'stockerResourcesWarning':
+            stockerResourcesWarning = !!CookiStocker.state[prefName];
+            CookiStocker.updateWarn();
+            break;
+        case 'stockerExponential':
+            stockerExponential = !!CookiStocker.state[prefName];
+            break;
+        case 'stockerTransactionNotifications':
+            stockerTransactionNotifications = !!CookiStocker.state[prefName];
+            break;
+        case 'stockerActivityReport':
+            stockerActivityReport = !!CookiStocker.state[prefName];
+            CookiStocker.ensureReportTimer();
+            break;
+        case 'stockerFastNotifications':
+            stockerFastNotifications = !!CookiStocker.state[prefName];
+            break;
+        case 'stockerConsoleAnnouncements':
+            stockerConsoleAnnouncements = !!CookiStocker.state[prefName];
+            CookiStocker.ensureReportTimer();
+            break;
+        case 'stockerAdditionalTradingStats':
+            stockerAdditionalTradingStats = !!CookiStocker.state[prefName];
+            CookiStocker.updateAdditionalStatsVisibility();
+            break;
+        case 'stockerForceLoopUpdates':
+            stockerForceLoopUpdates = !!CookiStocker.state[prefName];
+            break;
+    }
+    PlaySound('snd/tick.mp3');
+    Game.UpdateMenu();
+};
+
+// Commission = 20% * 0.95^brokers
+CookiStocker.calcCommission = function (n) {
+    const rate = 0.20 * Math.pow(0.95, Math.max(0, Math.min(162, +n || 0)));
+    return (rate * 100).toFixed(3) + "%";
+};
+
+// Minutes:seconds → ms writer for the two time prefs
+CookiStocker.ChangeTime = function (prefName, minId, secId) {
+    let mins = Math.max(0, Math.floor(+l(minId).value || 0));
+    let secs = Math.max(0, Math.min(59, Math.floor(+l(secId).value || 0)));
+    let ms = (mins * 60 + secs) * 1000;
+
+    switch (prefName) {
+        case 'stockerActivityReportFrequency':
+            stockerActivityReportFrequency = ms;
+            if (CookiStocker.reportTimer) {
+                clearInterval(CookiStocker.reportTimer);
+                CookiStocker.reportTimer = null;
+            }
+            CookiStocker.ensureReportTimer();
+            break;
+        case 'stockerLoopFrequency':
+            stockerLoopFrequency = ms;
+            if (stockerForceLoopUpdates && CookiStocker.Bank && CookiStocker.Bank.secondsPerTick) {
+                CookiStocker.Bank.secondsPerTick = Math.max(0.001, stockerLoopFrequency / 1000);
+            }
+            break;
+    }
+    PlaySound('snd/tick.mp3');
+};
+
+CookiStocker.ChangeNumber = function (prefName, val) {
+    let v = Math.max(0, Math.floor(+val || 0));
+    switch (prefName) {
+        case 'stockerMinBrokers':
+            stockerMinBrokers = v;
+            break;
+
+        case 'stockerActivityReportFrequency':
+            stockerActivityReportFrequency = v;
+            if (CookiStocker.reportTimer) {
+                clearInterval(CookiStocker.reportTimer);
+                CookiStocker.reportTimer = null;
+            }
+            CookiStocker.ensureReportTimer();
+            break;
+
+        case 'stockerLoopFrequency':
+            stockerLoopFrequency = v;
+            if (stockerForceLoopUpdates && CookiStocker.Bank && CookiStocker.Bank.secondsPerTick) {
+                CookiStocker.Bank.secondsPerTick = Math.max(0.001, stockerLoopFrequency / 1000);
+            }
+            break;
+    }
+    PlaySound('snd/tick.mp3');
+};
+
+// Build the Options menu body (uses CCSE.MenuHelper like Cookie Assistant)
+CookiStocker.getMenuString = function () {
+    const minutes = (stockerActivityReportFrequency || 0) / 60000;	// may be fractional
+    const loopSeconds = Math.floor((stockerLoopFrequency || 0) / 1000);
+    var m = CCSE.MenuHelper;
+    let str = '';
+
+    str += '<div id="csRoot">';
+
+    // ---------- Automation ----------
+    str += m.Header('Automation');
+
+    // Auto trading
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerAutoTrading', 'CS_autoTrading', 'Auto Trading ON', 'Auto Trading OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerAutoTrading', false)
+        + '</div>';
+
+    // Turns the entire stock market on or off.
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerMarketOn', 'CS_market', 'Stock Market ON', 'Stock Market OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerMarketOn', false)
+        + '</div>';
+
+    // Auto-buy minimum brokers
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerAutoBuyMinimumBrokers', 'CS_autoBuyMinimumBrokers', 'Auto-buy Minimum Brokers ON', 'Auto-buy Minimum Brokers OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerAutoBuyMinimumBrokers', false)
+        + '</div>';
+
+    // Auto-buy additional brokers
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerAutoBuyAdditionalBrokers', 'CS_autoBuyAdditionalBrokers', 'Auto-buy Additional Brokers ON', 'Auto-buy Additional Brokers OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerAutoBuyAdditionalBrokers', false)
+        + '</div>';
+
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerResourcesWarning', 'CS_resourcesWarning', 'Resources Warning ON', 'Resources Warning OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerResourcesWarning', false)
+        + '</div>';
+
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerExponential', 'CS_Exponential', 'Exponential Warehouses ON', 'Exponential Warehouses OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerExponential', false)
+        + '</div>';
+
+    // ---Exponential multiplier slider (CCSE helper, right-hand live value)
+    var cbWarehouseExponent = "stockerExponentialPower = (l('exponentSlider').value);"
+        + " l('exponentSliderRightText').textContent = stockerExponentialPower;"
+        + " CookiStocker.TradingStats();";
+
+    str += '<div class="listing">'
+        + CCSE.MenuHelper.Slider(
+            'exponentSlider', 'Warehouse Exponent', '<span id="exponentSliderRightText">' + stockerExponentialPower + '</span>', () => stockerExponentialPower, cbWarehouseExponent, 0.1, 3.0, 0.1
+        )
+        + ' ' + CookiStocker.note('stockerExponentialPower', false)
+        + '</div>';
+
+    // --- Min brokers slider (CCSE helper, right-hand live value)
+    var cbMinBrokers = "stockerMinBrokers = Math.round(l('minBrokersSlider').value);"
+        + " l('minBrokersSliderRightText').textContent = stockerMinBrokers;"
+        + " l('CS_commissionVal').textContent = CookiStocker.calcCommission(stockerMinBrokers);"
+        + " CookiStocker.TradingStats();";
+
+    str += '<div class="listing">'
+        + CCSE.MenuHelper.Slider(
+            'minBrokersSlider', 'Minimum Brokers', '<span id="minBrokersSliderRightText">' + stockerMinBrokers + '</span>', () => stockerMinBrokers, cbMinBrokers, 0, 162, 1
+        )
+        + ' <span class="smallLabel">(Commission: <span id="CS_commissionVal">'
+        + CookiStocker.calcCommission(stockerMinBrokers)
+        + '</span>)</span>'
+        + CookiStocker.note('stockerMinBrokers', false)
+        + '</div>';
+
+    // --- Bank percentage allowed per purchase (CCSE helper; shows %; stores fraction)
+    var stockerCookiesPercent = Math.round((stockerCookiesThreshold || 0) * 100);
+    var cbCookies = "var v = Math.round(l('cookiesPercentSlider').value);"
+        + " stockerCookiesPercent = v;"
+        + " stockerCookiesThreshold = v / 100;"
+        + " l('cookiesPercentSliderRightText').textContent = v + '%';"
+        + " CookiStocker.TradingStats();";
+
+    str += '<div class="listing">'
+        + CCSE.MenuHelper.Slider('cookiesPercentSlider', 'Max Bank % per Purchase', '<span id="cookiesPercentSliderRightText">' + stockerCookiesPercent + '%</span>', () => stockerCookiesPercent, cbCookies, 1, 100, 1)
+        + ' ' + CookiStocker.note('stockerCookiesThreshold', false)
+        + '</div>';
+
+
+    // ---------- Reporting & Notifications ----------
+    str += m.Header('Reporting & Notifications');
+
+    // Transaction notifs
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerTransactionNotifications', 'CS_txNotifs', 'TX Notifications ON', 'TX Notifications OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerTransactionNotifications', false)
+        + '</div>';
+
+    // Fast notifs
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerFastNotifications', 'CS_fastNotifs', 'Fast Notifications ON', 'Fast Notifications OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerFastNotifications', false)
+        + '</div>';
+
+    // Console announcements
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerConsoleAnnouncements', 'CS_console', 'Console Announce ON', 'Console Announce OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerConsoleAnnouncements', false)
+        + '</div>';
+
+    // --- Activity report interval: mm:ss
+    var _arMin = Math.floor(stockerActivityReportFrequency / 60000);
+    var _arSec = Math.floor((stockerActivityReportFrequency % 60000) / 1000);
+    str += '<div class="listing">'
+        + '<label>Report interval:</label> '
+        + '<input id="CS_activityMin" class="smallInput" type="text" size="5" min="0" value="' + _arMin + '"'
+        + ' style="text-align:right !important; width:3ch !important; min-width:3ch !important; max-width:3ch !important;" '
+        + ' inputmode="numeric" '
+        + ' oninput="CookiStocker.ChangeTime(\'stockerActivityReportFrequency\',\'CS_activityMin\',\'CS_activitySec\');"> : '
+        + '<input id="CS_activitySec" class="smallInput" type="text" size="5" min="0" max="59" value="' + _arSec + '"'
+        + ' style="text-align:right !important; width:3ch !important; min-width:3ch !important; max-width:3ch !important;" '
+        + ' inputmode="numeric" '
+        + ' oninput="CookiStocker.ChangeTime(\'stockerActivityReportFrequency\',\'CS_activityMin\',\'CS_activitySec\');"> '
+        + '<span class="smallLabel">mm:ss</span>'
+        + '</div>';
+
+    // Extra stats
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerAdditionalTradingStats', 'CS_moreStats', 'Extra Trading Stats ON', 'Extra Trading Stats OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerAdditionalTradingStats', false)
+        + '</div>';
+
+    // ---------- Timing (Advanced) ----------
+    str += m.Header('Timing (Advanced)');
+
+    // Loop frequency (UI shows SECONDS; integers; right-justified ~5 digits)
+    str += '<div class="listing">'
+        + '<label>Loop (seconds): </label>'
+        + '<input id="CS_loopFreq" type="text" size="5" '
+        + ' value="' + loopSeconds + '" '
+        + ' style="text-align:right !important; width:5ch !important; min-width:5ch !important; max-width:5ch !important;" '
+        + ' inputmode="numeric" '
+        + ' oninput="CookiStocker.ChangeNumber(\'stockerLoopFrequency\', this.value);" />'
+        + CookiStocker.note('stockerLoopFrequency', true)
+        + '</div>';
+
+    // Force loop (cheat)
+    str += '<div class="listing">'
+        + m.ToggleButton(CookiStocker.state, 'stockerForceLoopUpdates', 'CS_forceLoop', 'Force Loop (cheat) ON', 'Force Loop (cheat) OFF', "CookiStocker.Toggle")
+        + CookiStocker.note('stockerForceLoopUpdates', true)
+        + '</div>';
+
+    str += '</div>';
+    return str;
+};
+
+// ---------- Inline option comments (no tooltips) ----------
+CookiStocker.esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+};
+
+// Texts copied from the comments above your variable defs
+CookiStocker.docs = {
+    stockerAutoTrading: "Automatic trading when on",
+    stockerMarketOn: "Stock market is running when on",
+    stockerMinBrokers: "Minimum number of brokers required for automatic trading",
+    stockerCookiesThreshold: "Percentage of banked cookies allowed for a single automatic trade",
+    stockerAutoBuyMinimumBrokers: "Buy all necessary brokers as soon as you can afford them",
+    stockerResourcesWarning: "Display warning when market conditions and/or options do not permit auto trading",
+    stockerExponential: "Increases number of warehouses in sync with the highest raw CPS during this session",
+    stockerExponentialPower: "The ratio of the highest raw CPS to the original raw CPS is raised to this power when Exponential Warehouses is on",
+    stockerTransactionNotifications: "Announce transactions in game notifications",
+    stockerActivityReport: "Make regular profit reports",
+    stockerActivityReportFrequency: "How often to make regular reports (minutes and seconds)",
+    stockerFastNotifications: "Make game notifications fade away on their own after 6 seconds",
+    stockerConsoleAnnouncements: "Use console.log for more detailed info on prices and trends",
+    stockerAdditionalTradingStats: "Display more detailed trading info near the top of the stock market display",
+    stockerLoopFrequency: "Logic loop frequency (seconds) — CHEAT",
+    stockerForceLoopUpdates: "The cheat itself. Rolls the cycle every time logic loop triggers — CHEAT",
+    stockerAutoBuyAdditionalBrokers: "Buy additional brokers as soon as you can afford them",
+};
+
+// Render end-of-line text (red if cheat)
+CookiStocker.note = function (key, cheat) {
+    const t = CookiStocker.esc(CookiStocker.docs[key] || "");
+    return t ? (' <span class="smallLabel" style="color:' + (cheat ? '#ff3705' : 'rgba(255,255,255,0.65)') + '">' + t + '</span>') : '';
+};
+
+// Commission = 20% * 0.95^brokers → show as percentage
+CookiStocker.calcCommission = function (n) {
+    const rate = 0.20 * Math.pow(0.95, Math.max(0, Math.min(162, +n || 0)));
+    return (rate * 100).toFixed(3) + "%";
+};
+
+CookiStocker.save = function () {
+    var str = '';
+
+    if (typeof CookiStocker.Bank === 'undefined')
+        return '';
+    let market = CookiStocker.Bank.goodsById;
+    str += Number(stockList.Check);
+    for (let i = 0; i < market.length; i++) {
+        str += '_' + encodeURIComponent(stockList.Goods[i].name);
+        str += '_' + Number(stockList.Goods[i].stock);
+        str += '_' + Number(stockList.Goods[i].val);
+        str += '_' + Number(stockList.Goods[i].currentPrice);
+        str += '_' + Number(stockList.Goods[i].mode);
+        str += '_' + Number(stockList.Goods[i].lastMode);
+        str += '_' + Number(stockList.Goods[i].lastDur);
+        str += '_' + Number(stockList.Goods[i].unchangedDur);
+        str += '_' + Number(stockList.Goods[i].dropCount);
+        str += '_' + Number(stockList.Goods[i].riseCount);
+        str += '_' + Number(stockList.Goods[i].profit);
+        str += '_' + (+!!stockList.Goods[i].someSold);
+        str += '_' + (+!!stockList.Goods[i].someBought);
+    }
+    str += '_' + Number(stockList.Start);
+    str += '_' + Number(stockList.lastTime);
+    str += '_' + Number(stockList.startingProfits);
+    str += '_' + Number(stockList.Profits);
+    str += '_' + Number(stockList.netProfits);
+    str += '_' + Number(stockList.grossProfits);
+    str += '_' + Number(stockList.grossLosses);
+    str += '_' + Number(stockList.totalStocks);
+    str += '_' + Number(stockList.totalShares);
+    str += '_' + Number(stockList.totalValue);
+    str += '_' + Number(stockList.unrealizedProfits);
+    str += '_' + Number(stockList.profitableStocks);
+    str += '_' + Number(stockList.unprofitableStocks);
+    str += '_' + Number(stockList.profitableTrades);
+    str += '_' + Number(stockList.unprofitableTrades);
+    str += '_' + Number(stockList.Purchases);
+    str += '_' + Number(stockList.Sales);
+    str += '_' + Number(stockList.Uptime);
+    str += '_' + Number(stockList.hourlyProfits);
+    str += '_' + Number(stockList.dailyProfits);
+    str += '_' + Number(stockList.minCookies);
+    str += '_' + Number(stockList.maxCookies);
+    str += '_' + (+!!stockList.noModActions);
+    str += '_' + Number(stockList.origCookiesPsRawHighest);
+    for (i = 0; i < stockerModeProfits.length; i++)
+        for (j = 0; j < stockerModeProfits[i].length; j++)
+            for (k = 0; k < stockerModeProfits[i][j].length; k++)
+                str += '_' + Number(stockerModeProfits[i][j][k]);
+    str += '_' + Number(Game.Achievements['Plasmic assets'].won);
+    str += '_' + Number(Game.Achievements['Bose-Einstein Condensed Assets'].won);
+// Append options tail (backward‑compatible)
+    const cfg = {
+        stockerAutoTrading,
+        stockerMinBrokers,
+        stockerAutoBuyMinimumBrokers,
+        stockerTransactionNotifications,
+        stockerActivityReport,
+        stockerActivityReportFrequency,
+        stockerFastNotifications,
+        stockerConsoleAnnouncements,
+        stockerAdditionalTradingStats,
+        stockerLoopFrequency,
+        stockerForceLoopUpdates,
+        stockerCookiesThreshold,
+        stockerResourcesWarning,
+        stockerMarketOn,
+        stockerExponential,
+        stockerExponentialPower,
+        stockerAutoBuyAdditionalBrokers,
+    };
+    str += '|CFG:' + JSON.stringify(cfg);
+    return str;
+}
+
+CookiStocker.load = function (str) {
+    let i = 0;
+    let j, k, m;
+
+    if (typeof CookiStocker.Bank === 'undefined' || !str || !(stockList.Goods[0].name.length > 0))
+        return false;
+
+    // --- strip optional config tail BEFORE underscore parsing (prevents token contamination) ---
+    let cfg = null;
+    let cfgIdx = (str || '').indexOf('|CFG:');
+    if (cfgIdx > -1) {
+        try {
+            cfg = JSON.parse(str.slice(cfgIdx + 5));
+        } catch (e) {
+            cfg = null;
+        }
+        str = str.slice(0, cfgIdx);
+    }
+
+    // Now split clean payload
+    let spl = str.split('_');
+
+    let market = CookiStocker.Bank.goodsById;
+
+    // Legacy sharesThreshold captured (used as a fallback for threshold migration)
+    let __legacyShares = NaN;
+
+    stockList.Check = Number(spl[i++] || 0);
+
+    // Goods block
+    for (j = 0; j < market.length; j++) {
+        // Older saves wrote NaN for names; if so, fall back to live name
+        var tok = (spl[i++] || '');
+        var nm;
+        try {
+            nm = decodeURIComponent(tok);
+        } catch (e) {
+            nm = tok;
+        }
+        if (!nm || nm === 'NaN') nm = market[j].name;
+        stockList.Goods[j].name = nm;
+
+        stockList.Goods[j].stock = Number(spl[i++] || 0);
+        stockList.Goods[j].val = Number(spl[i++] || 0);
+        stockList.Goods[j].currentPrice = Number(spl[i++] || 0);
+        stockList.Goods[j].mode = Number(spl[i++] || 0);
+        stockList.Goods[j].lastMode = Number(spl[i++] || 0);
+        stockList.Goods[j].lastDur = Number(spl[i++] || 0);
+        stockList.Goods[j].unchangedDur = Number(spl[i++] || 0);
+        stockList.Goods[j].dropCount = Number(spl[i++] || 0);
+        stockList.Goods[j].riseCount = Number(spl[i++] || 0);
+        stockList.Goods[j].profit = Number(spl[i++] || 0);
+        stockList.Goods[j].someSold = !!(+spl[i++] || 0);
+        stockList.Goods[j].someBought = !!(+spl[i++] || 0);
+    }
+
+    // Core counters
+    stockList.Start = Number(spl[i++] || 0);
+    stockList.lastTime = Number(spl[i++] || 0);
+    stockList.startingProfits = Number(spl[i++] || 0);
+    stockList.Profits = Number(spl[i++] || 0);
+    stockList.netProfits = Number(spl[i++] || 0);
+    stockList.grossProfits = Number(spl[i++] || 0);
+    stockList.grossLosses = Number(spl[i++] || 0);
+    stockList.totalStocks = Number(spl[i++] || 0);
+    stockList.totalShares = Number(spl[i++] || 0);
+    stockList.totalValue = Number(spl[i++] || 0);
+    stockList.unrealizedProfits = Number(spl[i++] || 0);
+    stockList.profitableStocks = Number(spl[i++] || 0);
+    stockList.unprofitableStocks = Number(spl[i++] || 0);
+    stockList.profitableTrades = Number(spl[i++] || 0);
+    stockList.unprofitableTrades = Number(spl[i++] || 0);
+    stockList.Purchases = Number(spl[i++] || 0);
+    stockList.Sales = Number(spl[i++] || 0);
+    stockList.Uptime = Number(spl[i++] || 0);
+    stockList.hourlyProfits = Number(spl[i++] || 0);
+    stockList.dailyProfits = Number(spl[i++] || 0);
+
+    // ---- Tail autodetect (back-compat with 2.3) ----
+    // OLD (2.3):   [sharesThreshold, minCookies, maxCookies]
+    // NEW:         [minCookies, maxCookies, noModActions, origCookiesPsRawHighest, ...modeProfits..., plasmicWon, boseWon]
+    var looksLikeOldTail = false;
+    if (i < spl.length) {
+        var probe = spl[i];
+        var num = Number(probe);
+        // sharesThreshold was a fraction 0 < x < 1 ; minCookies is a large integer → this distinguishes tails
+        if (isFinite(num) && num > 0 && num < 1 && probe.indexOf('.') !== -1) looksLikeOldTail = true;
+    }
+
+    if (looksLikeOldTail) {
+        // Consume old tail: sharesThreshold (legacy), minCookies, maxCookies
+        var _sharesThreshold = Number(spl[i++] || 0);
+        __legacyShares = _sharesThreshold;
+
+        stockList.minCookies = Number(spl[i++] || 0);
+        stockList.maxCookies = Number(spl[i++] || 0);
+
+        // Fields that didn't exist in 2.3
+        stockList.noModActions = 0;
+        stockList.origCookiesPsRawHighest = 0;
+
+        // Mode profit grid did not exist → zero it
+        for (j = 0; j < stockerModeProfits.length; j++)
+            for (k = 0; k < stockerModeProfits[j].length; k++)
+                for (m = 0; m < stockerModeProfits[j][k].length; m++)
+                    stockerModeProfits[j][k][m] = 0;
+
+        // Achievements were not serialized → treat as not won
+        CookiStocker.ensureAchievements && CookiStocker.ensureAchievements();
+        if (Game.Achievements['Plasmic assets']) Game.Achievements['Plasmic assets'].won = 0;
+        if (Game.Achievements['Bose-Einstein Condensed Assets']) Game.Achievements['Bose-Einstein Condensed Assets'].won = 0;
+    } else {
+        // NEW tail parsing (current format)
+        stockList.minCookies = Number(spl[i++] || 0);
+        stockList.maxCookies = Number(spl[i++] || 0);
+        stockList.noModActions = !!(+spl[i++] || 0);
+        stockList.origCookiesPsRawHighest = Number(spl[i++] || 0);
+
+        // Mode profit grid
+        for (j = 0; j < stockerModeProfits.length; j++)
+            for (k = 0; k < stockerModeProfits[j].length; k++)
+                for (m = 0; m < stockerModeProfits[j][k].length; m++)
+                    stockerModeProfits[j][k][m] = Number(spl[i++] || 0);
+
+        // Achievements (defensive 0/1 only)
+        CookiStocker.ensureAchievements && CookiStocker.ensureAchievements();
+        var t = +spl[i++];
+        if (Game.Achievements['Plasmic assets']) Game.Achievements['Plasmic assets'].won = (t === 1 ? 1 : 0);
+        t = +spl[i++];
+        if (Game.Achievements['Bose-Einstein Condensed Assets']) Game.Achievements['Bose-Einstein Condensed Assets'].won = (t === 1 ? 1 : 0);
+    }
+
+    // --- apply cfg tail (if present) ---
+    if (cfg) {
+        if ('stockerAutoTrading' in cfg) stockerAutoTrading = !!cfg.stockerAutoTrading;
+        if ('stockerMarketOn' in cfg) stockerMarketOn = !!cfg.stockerMarketOn;
+        if ('stockerMinBrokers' in cfg) stockerMinBrokers = +cfg.stockerMinBrokers | 0;
+        if ('stockerCookiesThreshold' in cfg) stockerCookiesThreshold = +cfg.stockerCookiesThreshold;
+        if ('stockerAutoBuyMinimumBrokers' in cfg) stockerAutoBuyMinimumBrokers = !!cfg.stockerAutoBuyMinimumBrokers;
+        if ('stockerAutoBuyAdditionalBrokers' in cfg) stockerAutoBuyAdditionalBrokers = !!cfg.stockerAutoBuyAdditionalBrokers;
+        if ('stockerResourcesWarning' in cfg) stockerResourcesWarning = !!cfg.stockerResourcesWarning;
+        if ('stockerExponential' in cfg) stockerExponential = !!cfg.stockerExponential;
+        if ('stockerExponentialPower' in cfg) stockerExponentialPower = +cfg.stockerExponentialPower | 0;
+        if ('stockerTransactionNotifications' in cfg) stockerTransactionNotifications = !!cfg.stockerTransactionNotifications;
+        if ('stockerActivityReport' in cfg) stockerActivityReport = !!cfg.stockerActivityReport;
+        if ('stockerActivityReportFrequency' in cfg) stockerActivityReportFrequency = +cfg.stockerActivityReportFrequency | 0;
+        if ('stockerFastNotifications' in cfg) stockerFastNotifications = !!cfg.stockerFastNotifications;
+        if ('stockerConsoleAnnouncements' in cfg) stockerConsoleAnnouncements = !!cfg.stockerConsoleAnnouncements;
+        if ('stockerAdditionalTradingStats' in cfg) stockerAdditionalTradingStats = !!cfg.stockerAdditionalTradingStats;
+        if ('stockerLoopFrequency' in cfg) stockerLoopFrequency = +cfg.stockerLoopFrequency | 0;
+        if ('stockerForceLoopUpdates' in cfg) stockerForceLoopUpdates = !!cfg.stockerForceLoopUpdates;
+
+        // --- normalize cookies threshold with legacy fallback (fixes “negative bank” on old saves) ---
+        var __th = stockerCookiesThreshold;
+        var __legacyCfg = (('sharesThreshold' in cfg) ? +cfg.sharesThreshold : NaN);
+        if (!(+__th > 0 && +__th <= 1 && isFinite(+__th))) {
+            if (+__legacyCfg > 0 && +__legacyCfg <= 1 && isFinite(+__legacyCfg)) __th = +__legacyCfg;
+            else if (typeof __legacyShares === 'number' && __legacyShares > 0 && __legacyShares <= 1) __th = __legacyShares;
+            else __th = 0.05;
+        }
+        stockerCookiesThreshold = Math.min(1, Math.max(0.000001, +__th));	// never 0/NaN
+
+        // Clamp a couple of user-entered intervals to sane ranges
+        if (!(stockerLoopFrequency > 0)) stockerLoopFrequency = 30000;
+        if (stockerLoopFrequency < 1000) stockerLoopFrequency = 1000;
+        if (!(stockerActivityReportFrequency > 0)) stockerActivityReportFrequency = 60000;
+        if (stockerActivityReportFrequency < 1000) stockerActivityReportFrequency = 1000;
+
+        // Clamp brokers to slider bounds
+        if (stockerMinBrokers < 0) stockerMinBrokers = 0;
+        if (stockerMinBrokers > 162) stockerMinBrokers = 162;
+
+        // Sync the menu state mirror (aligned block)
+        CookiStocker.state.stockerAutoTrading = +!!stockerAutoTrading;
+        CookiStocker.state.stockerMarketOn = +!!stockerMarketOn;
+        CookiStocker.state.stockerAutoBuyMinimumBrokers = +!!stockerAutoBuyMinimumBrokers;
+        CookiStocker.state.stockerAutoBuyAdditionalBrokers = +!!stockerAutoBuyAdditionalBrokers;
+        CookiStocker.state.stockerResourcesWarning = +!!stockerResourcesWarning;
+        CookiStocker.state.stockerExponential = +!!stockerExponential;
+        CookiStocker.state.stockerTransactionNotifications = +!!stockerTransactionNotifications;
+        CookiStocker.state.stockerActivityReport = +!!stockerActivityReport;
+        CookiStocker.state.stockerFastNotifications = +!!stockerFastNotifications;
+        CookiStocker.state.stockerConsoleAnnouncements = +!!stockerConsoleAnnouncements;
+        CookiStocker.state.stockerAdditionalTradingStats = +!!stockerAdditionalTradingStats;
+        CookiStocker.state.stockerForceLoopUpdates = +!!stockerForceLoopUpdates;
+
+        // Honor report timer if needed
+        CookiStocker.ensureReportTimer();
+
+        // visibility for optional extra stats
+        CookiStocker.state.stockerAdditionalTradingStats = +!!stockerAdditionalTradingStats;
+
+        // honor current setting immediately (post-load)
+        CookiStocker.updateAdditionalStatsVisibility();
+    }
+
+    // First paint with restored settings (also recomputes min/max and calls updateWarn)
+    if (l('bankHeader'))
+        CookiStocker.TradingStats();
+
+    return true;
+};
+
+CookiStocker.reset = function (hard) {
+    if (typeof CookiStocker.Bank === 'undefined')
+        return;				// Nothing to reset
+    // Stop the running loop during ascension / reset
+    if (CookiStocker._loopTimer) {
+        clearInterval(CookiStocker._loopTimer);
+        CookiStocker._loopTimer = 0;
+    }
+
+    let i, j, k;
+    let market = CookiStocker.Bank.goodsById;
+
+    stockList.Goods = [];
+    for (let i = 0; i < market.length; i++) {
+        stockList.Goods.push({
+            name: market[i].name,
+            stock: market[i].stock,
+            currentPrice: market[i].val,
+            mode: market[i].mode,
+            lastMode: market[i].mode,
+            lastDur: market[i].dur,
+            unchangedDur: 0,
+            dropCount: 0,
+            riseCount: 0,
+            profit: 0,
+            someSold: false,
+            someBought: false,
+        });
+    }
+    stockList.Start = Date.now() + 500;
+    stockList.lastTime = Date.now() + 500;
+    stockList.startingProfits = 0;
+    stockList.Profits = 0;
+    stockList.netProfits = 0;
+    stockList.grossProfits = 0;
+    stockList.grossLosses = 0;
+    stockList.totalStocks = 0;
+    stockList.totalShares = 0;
+    stockList.totalValue = 0;
+    stockList.unrealizedProfits = 0;
+    stockList.profitableStocks = 0;
+    stockList.unprofitableStocks = 0;
+    stockList.profitableTrades = 0;
+    stockList.unprofitableTrades = 0;
+    stockList.Purchases = 0;
+    stockList.Sales = 0;
+    stockList.Uptime = 0;
+    stockList.hourlyProfits = 0;
+    stockList.dailyProfits = 0;
+    stockList.minCookies = Number.MAX_VALUE;
+    stockList.maxCookies = 0;
+    stockList.noModActions = true;
+    stockList.Amount = 0;
+    for (i = 0; i < stockerModeProfits.length; i++)
+        for (j = 0; j < stockerModeProfits[i].length; j++)
+            for (k = 0; k < stockerModeProfits[i][j].length; k++)
+                stockerModeProfits[i][j][k] = 0;
+    if (CookiStocker._tickTimeout) {
+        clearTimeout(CookiStocker._tickTimeout);
+        CookiStocker._tickTimeout = 0;
+    }
+    if (CookiStocker._reportTimeout) {
+        clearTimeout(CookiStocker._reportTimeout);
+        CookiStocker._reportTimeout = 0;
+    }
+    if (hard) {
+        stockerMarketOn = true;
+        stockList.origCookiesPsRawHighest = 0;
+        Game.Achievements['Plasmic assets'].won = 0;
+        Game.Achievements['Bose-Einstein Condensed Assets'].won = 0;
+    }
+}
+
+// Register at the end when everything is being initialized
 
 Game.registerMod('CookiStocker', {
     init: function () {
@@ -1147,671 +1840,3 @@ Game.registerMod('CookiStocker', {
         }, stockerLoopFrequency);
     },
 })
-
-CookiStocker.Reports = function () {
-    if (l("Brokers") == null || !stockList.Amount || !stockList.canBuy)
-        return;				// Stock market went away
-    CookiStocker.TradingStats();
-    if (stockList.noModActions || !stockerActivityReport && !stockerConsoleAnnouncements)
-        return;
-    let stockerNotificationTime = stockerFastNotifications * 6;
-
-    if (stockerActivityReport)
-        if ((stockList.Purchases + stockList.Sales) == 0) {
-            Game.Notify(
-                `CookiStocker report ${new Date().toLocaleTimeString([], {
-                    hourCycle: 'h23',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })}`,
-                `This session has been running for ${stockerTimeBeautifier(stockList.Uptime)}, but no good investment opportunities were detected! Luck is not on our side, yet.`
-                , [1, 33], stockerNotificationTime
-            );
-        } else {
-            Game.Notify(
-                `CookiStocker report ${new Date().toLocaleTimeString([], {
-                    hourCycle: 'h23',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })}`,
-                `This session has been running for ${stockerTimeBeautifier(stockList.Uptime)} and has made $${Beautify(stockList.netProfits, 0)} in net profits and $${Beautify(stockList.Profits, 0)} in revenue (displayed profits) in ${Beautify(stockList.Purchases, 0)} purchases and ${Beautify(stockList.Sales, 0)} sales.`, [1, 33], stockerNotificationTime
-            );
-        }
-    if (stockerConsoleAnnouncements) {
-        let totalProfits = 0;
-        let subtotalProfits = 0;
-        let deltaTotalProfits = 0;
-        let deltaSubtotalProfits = 0;
-        let totalTrades = 0;
-        let subtotalTrades = 0;
-        let profit = 0;
-        let lastProfit = 0;
-        let trades = 0;
-        let strProfit = '';
-        let strDeltaModeProfits = '';
-        let strTrades = '';
-        let j, k;
-
-        console.log(`Running for ${stockerTimeBeautifier(stockList.Uptime)} and made $${Beautify(stockList.netProfits, 0)}\n  in net profits and $${Beautify(stockList.Profits, 0)} in revenue (displayed profits)\n  in ${Beautify(stockList.Purchases, 0)} purchases and ${Beautify(stockList.Sales, 0)} sales.\nTotal number of stocks held: ${stockList.totalStocks}.  Total shares: ${Beautify(stockList.totalShares, 0)}.\nTotal value: $${Beautify(stockList.totalValue)}.  Unrealized profits: $${Beautify(stockList.unrealizedProfits, 2)}.\nTotal gross profits:  $${Beautify(stockList.grossProfits, 0)}.  Profitable stocks:  ${stockList.profitableStocks}.\nProfitable trades:  ${stockList.profitableTrades}.  Average profit per trade:  $${stockList.grossProfits ? Beautify(stockList.grossProfits / stockList.profitableTrades, 2) : 0}.\nTotal gross losses:  $${Beautify(stockList.grossLosses, 0)}.  Unprofitable stocks:  ${stockList.unprofitableStocks}.\nUnprofitable trades:  ${stockList.unprofitableTrades}.  Average loss per trade:  $${stockList.grossLosses ? Beautify(stockList.grossLosses / stockList.unprofitableTrades, 2) : 0}.`);
-
-        // Stats for individual modes
-        for (j = 0; j < 6; j++)
-            for (k = 0; k < 6; k++)
-                totalProfits += stockerModeProfits[j][k][0];
-        for (j = 0; j < 6; j++)
-            for (k = 0; k < 6; k++) {
-                profit = stockerModeProfits[j][k][0];
-                lastProfit = stockerModeProfits[j][k][1];
-                trades = stockerModeProfits[j][k][2];
-                strProfit = profit ? ((100 * profit / totalProfits).toFixed(2) + '%').padStart(8) : '';
-                strDeltaModeProfits = (lastProfit ? '$' + Beautify(lastProfit, 2) : '').padStart(14);
-                strTrades = trades ? (' ' + trades + ' trade' + (trades > 1 ? 's' : ' ')).padStart(13) : '';
-
-                console.log(`Profits[${j}][${k}] = $${Beautify(profit, 2).padEnd(14)} ${strProfit}${strDeltaModeProfits}${strTrades}`);
-                subtotalProfits += profit;
-                deltaSubtotalProfits += lastProfit;
-                deltaTotalProfits += lastProfit;
-                subtotalTrades += trades;
-                totalTrades += trades;
-            }
-
-        // Stats for subtotals
-        for (j = 0; j < 6; j++) {
-            subtotalProfits = 0;
-            deltaSubtotalProfits = 0;
-            subtotalTrades = 0;
-            for (k = 0; k < 6; k++) {
-                subtotalProfits += stockerModeProfits[j][k][0];
-                deltaSubtotalProfits += stockerModeProfits[j][k][1];
-                subtotalTrades += stockerModeProfits[j][k][2];
-                stockerModeProfits[j][k][1] = 0;
-            }
-            strProfit = subtotalProfits ? ((100 * subtotalProfits / totalProfits).toFixed(2) + '%').padStart(8) : '';
-            strDeltaModeProfits = (deltaSubtotalProfits ? '$' + Beautify(deltaSubtotalProfits, 2) : '').padStart(14);
-            strTrades = subtotalTrades ? (' ' + subtotalTrades + ' trade' + (subtotalTrades > 1 ? 's' : ' ')).padStart(13) : '';
-
-            console.log(`Subtotal[${j}]`.padEnd(14) + `= $${Beautify(subtotalProfits, 2).padEnd(14)} ${strProfit}${strDeltaModeProfits}${strTrades}`);
-            subtotalProfits = 0;
-            deltaSubtotalProfits = 0;
-            subtotalTrades = 0;
-        }
-
-        // Stats for totals
-        stockList.hourlyProfits = totalProfits * (stockerLoopFrequency / 60_000) * 3600_000 / (stockList.Uptime + 1);
-        stockList.dailyProfits = totalProfits * (stockerLoopFrequency / 60_000) * 86_400_000 / (stockList.Uptime + 1);
-
-        if (!stockerForceLoopUpdates) {
-            stockList.hourlyProfits *= 2;
-            stockList.dailyProfits *= 2;
-        }
-        console.log(`Total profits = $${Beautify(totalProfits, 2).padEnd(22)}${(deltaTotalProfits ? '$' + Beautify(deltaTotalProfits, 2) : '').padStart(15)}${totalTrades ? (' ' + totalTrades + ' trade' + (totalTrades > 1 ? 's' : ' ')).padStart(13) : ''}`);
-        console.log(`Profit per hour = $${Beautify(stockList.hourlyProfits, 2)}; profit per day = $${Beautify(stockList.dailyProfits, 2)}`);
-        console.log(`That's ${Beautify(stockList.hourlyProfits * Game.cookiesPsRawHighest, 2)} cookies and ${Beautify(stockList.dailyProfits * Game.cookiesPsRawHighest, 2)} cookies, respectively. It's also ${Beautify((stockList.hourlyProfits / 3600), 0)} times your highest raw cookie production rate.`);
-        if (stockerForceLoopUpdates) {
-            console.log('In unadjusted, true numbers:');
-            stockList.hourlyProfits *= 60_000 / stockerLoopFrequency;
-            stockList.dailyProfits *= 60_000 / stockerLoopFrequency;
-            console.log(`Profit per hour = $${Beautify(stockList.hourlyProfits, 2)}; profit per diem = $${Beautify(stockList.dailyProfits, 2)}`);
-            console.log(`That's ${Beautify(stockList.hourlyProfits * Game.cookiesPsRawHighest, 2)} cookies and ${Beautify(stockList.dailyProfits * Game.cookiesPsRawHighest, 2)} cookies, respectively. It's also ${Beautify((stockList.hourlyProfits / 3600), 0)} times your highest raw cookie production rate.`);
-        }
-        console.log('------------------------------------------------------------------');
-    }
-};
-
-// ===== CookiStocker options UI & persistence =====
-
-/** Mirror of boolean prefs for CCSE.ToggleButton to read/write.
- We keep the *real* vars exactly where they are (top of file); we just sync them here. */
-CookiStocker.state = {
-    stockerAutoTrading: +!!stockerAutoTrading,
-    stockerMarketOn: +!!stockerMarketOn,
-    stockerAutoBuyMinimumBrokers: +!!stockerAutoBuyMinimumBrokers,
-    stockerResourcesWarning: +!!stockerResourcesWarning,
-    stockerExponential: +!!stockerExponential,
-    stockerTransactionNotifications: +!!stockerTransactionNotifications,
-    stockerActivityReport: +!!stockerActivityReport,
-    stockerFastNotifications: +!!stockerFastNotifications,
-    stockerConsoleAnnouncements: +!!stockerConsoleAnnouncements,
-    stockerAdditionalTradingStats: +!!stockerAdditionalTradingStats,
-    stockerForceLoopUpdates: +!!stockerForceLoopUpdates,
-    stockerAutoBuyAdditionalBrokers: +!!stockerAutoBuyAdditionalBrokers,
-};
-
-// Toggle handler (signature matches CCSE.MenuHelper.ToggleButton)
-CookiStocker.Toggle = function (prefName, button, on, off, invert) {
-    // Flip state bit
-    CookiStocker.state[prefName] = CookiStocker.state[prefName] ? 0 : 1;
-
-    // Update button text/class
-    l(button).innerHTML = CookiStocker.state[prefName] ? on : off;
-    l(button).className = 'smallFancyButton prefButton option' + ((CookiStocker.state[prefName] ^ invert) ? '' : ' off');
-
-    // Write through to the *real* globals
-    switch (prefName) {
-        case 'stockerAutoTrading':
-            stockerAutoTrading = !!CookiStocker.state[prefName];
-            CookiStocker.updateWarn();
-            break;
-        case 'stockerMarketOn':
-            stockerMarketOn = !!CookiStocker.state[prefName];
-            CookiStocker.updateWarn();
-            CookiStocker.ensureReportTimer();
-            break;
-        case 'stockerAutoBuyMinimumBrokers':
-            stockerAutoBuyMinimumBrokers = !!CookiStocker.state[prefName];
-            CookiStocker.TradingStats();
-            break;
-        case 'stockerAutoBuyAdditionalBrokers':
-            stockerAutoBuyAdditionalBrokers = !!CookiStocker.state[prefName];
-            CookiStocker.TradingStats();
-            break;
-        case 'stockerResourcesWarning':
-            stockerResourcesWarning = !!CookiStocker.state[prefName];
-            CookiStocker.updateWarn();
-            break;
-        case 'stockerExponential':
-            stockerExponential = !!CookiStocker.state[prefName];
-            break;
-        case 'stockerTransactionNotifications':
-            stockerTransactionNotifications = !!CookiStocker.state[prefName];
-            break;
-        case 'stockerActivityReport':
-            stockerActivityReport = !!CookiStocker.state[prefName];
-            CookiStocker.ensureReportTimer();
-            break;
-        case 'stockerFastNotifications':
-            stockerFastNotifications = !!CookiStocker.state[prefName];
-            break;
-        case 'stockerConsoleAnnouncements':
-            stockerConsoleAnnouncements = !!CookiStocker.state[prefName];
-            CookiStocker.ensureReportTimer();
-            break;
-        case 'stockerAdditionalTradingStats':
-            stockerAdditionalTradingStats = !!CookiStocker.state[prefName];
-            CookiStocker.updateAdditionalStatsVisibility();
-            break;
-        case 'stockerForceLoopUpdates':
-            stockerForceLoopUpdates = !!CookiStocker.state[prefName];
-            break;
-    }
-    PlaySound('snd/tick.mp3');
-    Game.UpdateMenu();
-};
-
-// Commission = 20% * 0.95^brokers
-CookiStocker.calcCommission = function (n) {
-    const rate = 0.20 * Math.pow(0.95, Math.max(0, Math.min(162, +n || 0)));
-    return (rate * 100).toFixed(3) + "%";
-};
-
-// Minutes:seconds → ms writer for the two time prefs
-CookiStocker.ChangeTime = function (prefName, minId, secId) {
-    let mins = Math.max(0, Math.floor(+l(minId).value || 0));
-    let secs = Math.max(0, Math.min(59, Math.floor(+l(secId).value || 0)));
-    let ms = (mins * 60 + secs) * 1000;
-
-    switch (prefName) {
-        case 'stockerActivityReportFrequency':
-            stockerActivityReportFrequency = ms;
-            if (CookiStocker.reportTimer) {
-                clearInterval(CookiStocker.reportTimer);
-                CookiStocker.reportTimer = null;
-            }
-            CookiStocker.ensureReportTimer();
-            break;
-        case 'stockerLoopFrequency':
-            stockerLoopFrequency = ms;
-            if (stockerForceLoopUpdates && CookiStocker.Bank && CookiStocker.Bank.secondsPerTick) {
-                CookiStocker.Bank.secondsPerTick = Math.max(0.001, stockerLoopFrequency / 1000);
-            }
-            break;
-    }
-    PlaySound('snd/tick.mp3');
-};
-
-CookiStocker.ChangeNumber = function (prefName, val) {
-    let v = Math.max(0, Math.floor(+val || 0));
-    switch (prefName) {
-        case 'stockerMinBrokers':
-            stockerMinBrokers = v;
-            break;
-
-        case 'stockerActivityReportFrequency':
-            stockerActivityReportFrequency = v;
-            if (CookiStocker.reportTimer) {
-                clearInterval(CookiStocker.reportTimer);
-                CookiStocker.reportTimer = null;
-            }
-            CookiStocker.ensureReportTimer();
-            break;
-
-        case 'stockerLoopFrequency':
-            stockerLoopFrequency = v;
-            if (stockerForceLoopUpdates && CookiStocker.Bank && CookiStocker.Bank.secondsPerTick) {
-                CookiStocker.Bank.secondsPerTick = Math.max(0.001, stockerLoopFrequency / 1000);
-            }
-            break;
-    }
-    PlaySound('snd/tick.mp3');
-};
-
-// Build the Options menu body (uses CCSE.MenuHelper like Cookie Assistant)
-CookiStocker.getMenuString = function () {
-    const minutes = (stockerActivityReportFrequency || 0) / 60000;	// may be fractional
-    const loopSeconds = Math.floor((stockerLoopFrequency || 0) / 1000);
-    var m = CCSE.MenuHelper;
-    let str = '';
-
-    str += '<div id="csRoot">';
-
-    // ---------- Automation ----------
-    str += m.Header('Automation');
-
-    // Auto trading
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerAutoTrading', 'CS_autoTrading', 'Auto Trading ON', 'Auto Trading OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerAutoTrading', false)
-        + '</div>';
-
-    // Turns the entire stock market on or off.
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerMarketOn', 'CS_market', 'Stock Market ON', 'Stock Market OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerMarketOn', false)
-        + '</div>';
-
-    // Auto-buy minimum brokers
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerAutoBuyMinimumBrokers', 'CS_autoBuyMinimumBrokers', 'Auto-buy Minimum Brokers ON', 'Auto-buy Minimum Brokers OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerAutoBuyMinimumBrokers', false)
-        + '</div>';
-
-    // Auto-buy additional brokers
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerAutoBuyAdditionalBrokers', 'CS_autoBuyAdditionalBrokers', 'Auto-buy Additional Brokers ON', 'Auto-buy Additional Brokers OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerAutoBuyAdditionalBrokers', false)
-        + '</div>';
-
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerResourcesWarning', 'CS_resourcesWarning', 'Resources Warning ON', 'Resources Warning OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerResourcesWarning', false)
-        + '</div>';
-
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerExponential', 'CS_Exponential', 'Exponential Warehouses ON', 'Exponential Warehouses OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerExponential', false)
-        + '</div>';
-
-    // ---Exponential multiplier slider (CCSE helper, right-hand live value)
-    var cbWarehouseExponent = "stockerExponentialPower = (l('exponentSlider').value);"
-        + " l('exponentSliderRightText').textContent = stockerExponentialPower;"
-        + " CookiStocker.TradingStats();";
-
-    str += '<div class="listing">'
-        + CCSE.MenuHelper.Slider(
-            'exponentSlider', 'Warehouse Exponent', '<span id="exponentSliderRightText">' + stockerExponentialPower + '</span>', () => stockerExponentialPower, cbWarehouseExponent, 0.1, 3.0, 0.1
-        )
-        + ' ' + CookiStocker.note('stockerExponentialPower', false)
-        + '</div>';
-
-    // --- Min brokers slider (CCSE helper, right-hand live value)
-    var cbMinBrokers = "stockerMinBrokers = Math.round(l('minBrokersSlider').value);"
-        + " l('minBrokersSliderRightText').textContent = stockerMinBrokers;"
-        + " l('CS_commissionVal').textContent = CookiStocker.calcCommission(stockerMinBrokers);"
-        + " CookiStocker.TradingStats();";
-
-    str += '<div class="listing">'
-        + CCSE.MenuHelper.Slider(
-            'minBrokersSlider', 'Minimum Brokers', '<span id="minBrokersSliderRightText">' + stockerMinBrokers + '</span>', () => stockerMinBrokers, cbMinBrokers, 0, 162, 1
-        )
-        + ' <span class="smallLabel">(Commission: <span id="CS_commissionVal">'
-        + CookiStocker.calcCommission(stockerMinBrokers)
-        + '</span>)</span>'
-        + CookiStocker.note('stockerMinBrokers', false)
-        + '</div>';
-
-    // --- Bank percentage allowed per purchase (CCSE helper; shows %; stores fraction)
-    var stockerCookiesPercent = Math.round((stockerCookiesThreshold || 0) * 100);
-    var cbCookies = "var v = Math.round(l('cookiesPercentSlider').value);"
-        + " stockerCookiesPercent = v;"
-        + " stockerCookiesThreshold = v / 100;"
-        + " l('cookiesPercentSliderRightText').textContent = v + '%';"
-        + " CookiStocker.TradingStats();";
-
-    str += '<div class="listing">'
-        + CCSE.MenuHelper.Slider('cookiesPercentSlider', 'Max Bank % per Purchase', '<span id="cookiesPercentSliderRightText">' + stockerCookiesPercent + '%</span>', () => stockerCookiesPercent, cbCookies, 1, 100, 1)
-        + ' ' + CookiStocker.note('stockerCookiesThreshold', false)
-        + '</div>';
-
-
-    // ---------- Reporting & Notifications ----------
-    str += m.Header('Reporting & Notifications');
-
-    // Transaction notifs
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerTransactionNotifications', 'CS_txNotifs', 'TX Notifications ON', 'TX Notifications OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerTransactionNotifications', false)
-        + '</div>';
-
-    // Fast notifs
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerFastNotifications', 'CS_fastNotifs', 'Fast Notifications ON', 'Fast Notifications OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerFastNotifications', false)
-        + '</div>';
-
-    // Console announcements
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerConsoleAnnouncements', 'CS_console', 'Console Announce ON', 'Console Announce OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerConsoleAnnouncements', false)
-        + '</div>';
-
-    // --- Activity report interval: mm:ss
-    var _arMin = Math.floor(stockerActivityReportFrequency / 60000);
-    var _arSec = Math.floor((stockerActivityReportFrequency % 60000) / 1000);
-    str += '<div class="listing">'
-        + '<label>Report interval:</label> '
-        + '<input id="CS_activityMin" class="smallInput" type="text" size="5" min="0" value="' + _arMin + '"'
-        + ' style="text-align:right !important; width:3ch !important; min-width:3ch !important; max-width:3ch !important;" '
-        + ' inputmode="numeric" '
-        + ' oninput="CookiStocker.ChangeTime(\'stockerActivityReportFrequency\',\'CS_activityMin\',\'CS_activitySec\');"> : '
-        + '<input id="CS_activitySec" class="smallInput" type="text" size="5" min="0" max="59" value="' + _arSec + '"'
-        + ' style="text-align:right !important; width:3ch !important; min-width:3ch !important; max-width:3ch !important;" '
-        + ' inputmode="numeric" '
-        + ' oninput="CookiStocker.ChangeTime(\'stockerActivityReportFrequency\',\'CS_activityMin\',\'CS_activitySec\');"> '
-        + '<span class="smallLabel">mm:ss</span>'
-        + '</div>';
-
-    // Extra stats
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerAdditionalTradingStats', 'CS_moreStats', 'Extra Trading Stats ON', 'Extra Trading Stats OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerAdditionalTradingStats', false)
-        + '</div>';
-
-    // ---------- Timing (Advanced) ----------
-    str += m.Header('Timing (Advanced)');
-
-    // Loop frequency (UI shows SECONDS; integers; right-justified ~5 digits)
-    str += '<div class="listing">'
-        + '<label>Loop (seconds): </label>'
-        + '<input id="CS_loopFreq" type="text" size="5" '
-        + ' value="' + loopSeconds + '" '
-        + ' style="text-align:right !important; width:5ch !important; min-width:5ch !important; max-width:5ch !important;" '
-        + ' inputmode="numeric" '
-        + ' oninput="CookiStocker.ChangeNumber(\'stockerLoopFrequency\', this.value);" />'
-        + CookiStocker.note('stockerLoopFrequency', true)
-        + '</div>';
-
-    // Force loop (cheat)
-    str += '<div class="listing">'
-        + m.ToggleButton(CookiStocker.state, 'stockerForceLoopUpdates', 'CS_forceLoop', 'Force Loop (cheat) ON', 'Force Loop (cheat) OFF', "CookiStocker.Toggle")
-        + CookiStocker.note('stockerForceLoopUpdates', true)
-        + '</div>';
-
-    str += '</div>';
-    return str;
-};
-
-// ---------- Inline option comments (no tooltips) ----------
-CookiStocker.esc = function (s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-};
-
-// Texts copied from the comments above your variable defs
-CookiStocker.docs = {
-    stockerAutoTrading: "Automatic trading when on",
-    stockerMarketOn: "Stock market is running when on",
-    stockerMinBrokers: "Minimum number of brokers required for automatic trading",
-    stockerCookiesThreshold: "Percentage of banked cookies allowed for a single automatic trade",
-    stockerAutoBuyMinimumBrokers: "Buy all necessary brokers as soon as you can afford them",
-    stockerResourcesWarning: "Display warning when market conditions and/or options do not permit auto trading",
-    stockerExponential: "Increases number of warehouses in sync with the highest raw CPS during this session",
-    stockerExponentialPower: "The ratio of the highest raw CPS to the original raw CPS is raised to this power when Exponential Warehouses is on",
-    stockerTransactionNotifications: "Announce transactions in game notifications",
-    stockerActivityReport: "Make regular profit reports",
-    stockerActivityReportFrequency: "How often to make regular reports (minutes and seconds)",
-    stockerFastNotifications: "Make game notifications fade away on their own after 6 seconds",
-    stockerConsoleAnnouncements: "Use console.log for more detailed info on prices and trends",
-    stockerAdditionalTradingStats: "Display more detailed trading info near the top of the stock market display",
-    stockerLoopFrequency: "Logic loop frequency (seconds) — CHEAT",
-    stockerForceLoopUpdates: "The cheat itself. Rolls the cycle every time logic loop triggers — CHEAT",
-    stockerAutoBuyAdditionalBrokers: "Buy additional brokers as soon as you can afford them",
-};
-
-// Render end-of-line text (red if cheat)
-CookiStocker.note = function (key, cheat) {
-    const t = CookiStocker.esc(CookiStocker.docs[key] || "");
-    return t ? (' <span class="smallLabel" style="color:' + (cheat ? '#ff3705' : 'rgba(255,255,255,0.65)') + '">' + t + '</span>') : '';
-};
-
-// Commission = 20% * 0.95^brokers → show as percentage
-CookiStocker.calcCommission = function (n) {
-    const rate = 0.20 * Math.pow(0.95, Math.max(0, Math.min(162, +n || 0)));
-    return (rate * 100).toFixed(3) + "%";
-};
-
-/*
-function sleepSync(ms) {
-	const end = Date.now() + ms;
-	while (Date.now() < end) {}	// busy-wait
-}
-*/
-
-    // Core counters
-    stockList.Start = Number(spl[i++] || 0);
-    stockList.lastTime = Number(spl[i++] || 0);
-    stockList.startingProfits = Number(spl[i++] || 0);
-    stockList.Profits = Number(spl[i++] || 0);
-    stockList.netProfits = Number(spl[i++] || 0);
-    stockList.grossProfits = Number(spl[i++] || 0);
-    stockList.grossLosses = Number(spl[i++] || 0);
-    stockList.totalStocks = Number(spl[i++] || 0);
-    stockList.totalShares = Number(spl[i++] || 0);
-    stockList.totalValue = Number(spl[i++] || 0);
-    stockList.unrealizedProfits = Number(spl[i++] || 0);
-    stockList.profitableStocks = Number(spl[i++] || 0);
-    stockList.unprofitableStocks = Number(spl[i++] || 0);
-    stockList.profitableTrades = Number(spl[i++] || 0);
-    stockList.unprofitableTrades = Number(spl[i++] || 0);
-    stockList.Purchases = Number(spl[i++] || 0);
-    stockList.Sales = Number(spl[i++] || 0);
-    stockList.Uptime = Number(spl[i++] || 0);
-    stockList.hourlyProfits = Number(spl[i++] || 0);
-    stockList.dailyProfits = Number(spl[i++] || 0);
-
-    // ---- Tail autodetect (back-compat with 2.3) ----
-    // OLD (2.3):   [sharesThreshold, minCookies, maxCookies]
-    // NEW:         [minCookies, maxCookies, noModActions, origCookiesPsRawHighest, ...modeProfits..., plasmicWon, boseWon]
-    var looksLikeOldTail = false;
-    if (i < spl.length) {
-        var probe = spl[i];
-        var num = Number(probe);
-        // sharesThreshold was a fraction 0 < x < 1 ; minCookies is a large integer → this distinguishes tails
-        if (isFinite(num) && num > 0 && num < 1 && probe.indexOf('.') !== -1) looksLikeOldTail = true;
-    }
-
-    if (looksLikeOldTail) {
-        // Consume old tail: sharesThreshold (legacy), minCookies, maxCookies
-        var _sharesThreshold = Number(spl[i++] || 0);
-        __legacyShares = _sharesThreshold;
-
-        stockList.minCookies = Number(spl[i++] || 0);
-        stockList.maxCookies = Number(spl[i++] || 0);
-
-        // Fields that didn't exist in 2.3
-        stockList.noModActions = 0;
-        stockList.origCookiesPsRawHighest = 0;
-
-        // Mode profit grid did not exist → zero it
-        for (j = 0; j < stockerModeProfits.length; j++)
-            for (k = 0; k < stockerModeProfits[j].length; k++)
-                for (m = 0; m < stockerModeProfits[j][k].length; m++)
-                    stockerModeProfits[j][k][m] = 0;
-
-        // Achievements were not serialized → treat as not won
-        CookiStocker.ensureAchievements && CookiStocker.ensureAchievements();
-        if (Game.Achievements['Plasmic assets']) Game.Achievements['Plasmic assets'].won = 0;
-        if (Game.Achievements['Bose-Einstein Condensed Assets']) Game.Achievements['Bose-Einstein Condensed Assets'].won = 0;
-    } else {
-        // NEW tail parsing (current format)
-        stockList.minCookies = Number(spl[i++] || 0);
-        stockList.maxCookies = Number(spl[i++] || 0);
-        stockList.noModActions = !!(+spl[i++] || 0);
-        stockList.origCookiesPsRawHighest = Number(spl[i++] || 0);
-
-        // Mode profit grid
-        for (j = 0; j < stockerModeProfits.length; j++)
-            for (k = 0; k < stockerModeProfits[j].length; k++)
-                for (m = 0; m < stockerModeProfits[j][k].length; m++)
-                    stockerModeProfits[j][k][m] = Number(spl[i++] || 0);
-
-        // Achievements (defensive 0/1 only)
-        CookiStocker.ensureAchievements && CookiStocker.ensureAchievements();
-        var t = +spl[i++];
-        if (Game.Achievements['Plasmic assets']) Game.Achievements['Plasmic assets'].won = (t === 1 ? 1 : 0);
-        t = +spl[i++];
-        if (Game.Achievements['Bose-Einstein Condensed Assets']) Game.Achievements['Bose-Einstein Condensed Assets'].won = (t === 1 ? 1 : 0);
-    }
-
-    // --- apply cfg tail (if present) ---
-    if (cfg) {
-        if ('stockerAutoTrading' in cfg) stockerAutoTrading = !!cfg.stockerAutoTrading;
-        if ('stockerMarketOn' in cfg) stockerMarketOn = !!cfg.stockerMarketOn;
-        if ('stockerMinBrokers' in cfg) stockerMinBrokers = +cfg.stockerMinBrokers | 0;
-        if ('stockerCookiesThreshold' in cfg) stockerCookiesThreshold = +cfg.stockerCookiesThreshold;
-        if ('stockerAutoBuyMinimumBrokers' in cfg) stockerAutoBuyMinimumBrokers = !!cfg.stockerAutoBuyMinimumBrokers;
-        if ('stockerAutoBuyAdditionalBrokers' in cfg) stockerAutoBuyAdditionalBrokers = !!cfg.stockerAutoBuyAdditionalBrokers;
-        if ('stockerResourcesWarning' in cfg) stockerResourcesWarning = !!cfg.stockerResourcesWarning;
-        if ('stockerExponential' in cfg) stockerExponential = !!cfg.stockerExponential;
-        if ('stockerExponentialPower' in cfg) stockerExponentialPower = +cfg.stockerExponentialPower | 0;
-        if ('stockerTransactionNotifications' in cfg) stockerTransactionNotifications = !!cfg.stockerTransactionNotifications;
-        if ('stockerActivityReport' in cfg) stockerActivityReport = !!cfg.stockerActivityReport;
-        if ('stockerActivityReportFrequency' in cfg) stockerActivityReportFrequency = +cfg.stockerActivityReportFrequency | 0;
-        if ('stockerFastNotifications' in cfg) stockerFastNotifications = !!cfg.stockerFastNotifications;
-        if ('stockerConsoleAnnouncements' in cfg) stockerConsoleAnnouncements = !!cfg.stockerConsoleAnnouncements;
-        if ('stockerAdditionalTradingStats' in cfg) stockerAdditionalTradingStats = !!cfg.stockerAdditionalTradingStats;
-        if ('stockerLoopFrequency' in cfg) stockerLoopFrequency = +cfg.stockerLoopFrequency | 0;
-        if ('stockerForceLoopUpdates' in cfg) stockerForceLoopUpdates = !!cfg.stockerForceLoopUpdates;
-
-        // --- normalize cookies threshold with legacy fallback (fixes “negative bank” on old saves) ---
-        var __th = stockerCookiesThreshold;
-        var __legacyCfg = (('sharesThreshold' in cfg) ? +cfg.sharesThreshold : NaN);
-        if (!(+__th > 0 && +__th <= 1 && isFinite(+__th))) {
-            if (+__legacyCfg > 0 && +__legacyCfg <= 1 && isFinite(+__legacyCfg)) __th = +__legacyCfg;
-            else if (typeof __legacyShares === 'number' && __legacyShares > 0 && __legacyShares <= 1) __th = __legacyShares;
-            else __th = 0.05;
-        }
-        stockerCookiesThreshold = Math.min(1, Math.max(0.000001, +__th));	// never 0/NaN
-
-        // Clamp a couple of user-entered intervals to sane ranges
-        if (!(stockerLoopFrequency > 0)) stockerLoopFrequency = 30000;
-        if (stockerLoopFrequency < 1000) stockerLoopFrequency = 1000;
-        if (!(stockerActivityReportFrequency > 0)) stockerActivityReportFrequency = 60000;
-        if (stockerActivityReportFrequency < 1000) stockerActivityReportFrequency = 1000;
-
-        // Clamp brokers to slider bounds
-        if (stockerMinBrokers < 0) stockerMinBrokers = 0;
-        if (stockerMinBrokers > 162) stockerMinBrokers = 162;
-
-        // Sync the menu state mirror (aligned block)
-        CookiStocker.state.stockerAutoTrading = +!!stockerAutoTrading;
-        CookiStocker.state.stockerMarketOn = +!!stockerMarketOn;
-        CookiStocker.state.stockerAutoBuyMinimumBrokers = +!!stockerAutoBuyMinimumBrokers;
-        CookiStocker.state.stockerAutoBuyAdditionalBrokers = +!!stockerAutoBuyAdditionalBrokers;
-        CookiStocker.state.stockerResourcesWarning = +!!stockerResourcesWarning;
-        CookiStocker.state.stockerExponential = +!!stockerExponential;
-        CookiStocker.state.stockerTransactionNotifications = +!!stockerTransactionNotifications;
-        CookiStocker.state.stockerActivityReport = +!!stockerActivityReport;
-        CookiStocker.state.stockerFastNotifications = +!!stockerFastNotifications;
-        CookiStocker.state.stockerConsoleAnnouncements = +!!stockerConsoleAnnouncements;
-        CookiStocker.state.stockerAdditionalTradingStats = +!!stockerAdditionalTradingStats;
-        CookiStocker.state.stockerForceLoopUpdates = +!!stockerForceLoopUpdates;
-
-        // Honor report timer if needed
-        CookiStocker.ensureReportTimer();
-
-        // visibility for optional extra stats
-        CookiStocker.state.stockerAdditionalTradingStats = +!!stockerAdditionalTradingStats;
-
-        // honor current setting immediately (post-load)
-        CookiStocker.updateAdditionalStatsVisibility();
-    }
-
-    // First paint with restored settings (also recomputes min/max and calls updateWarn)
-    if (l('bankHeader'))
-        CookiStocker.TradingStats();
-
-    return true;
-};
-
-CookiStocker.reset = function (hard) {
-    if (typeof CookiStocker.Bank === 'undefined')
-        return;				// Nothing to reset
-    // Stop the running loop during ascension / reset
-    if (CookiStocker._loopTimer) {
-        clearInterval(CookiStocker._loopTimer);
-        CookiStocker._loopTimer = 0;
-    }
-
-    let i, j, k;
-    let market = CookiStocker.Bank.goodsById;
-
-    stockList.Goods = [];
-    for (let i = 0; i < market.length; i++) {
-        stockList.Goods.push({
-            name: market[i].name,
-            stock: market[i].stock,
-            currentPrice: market[i].val,
-            mode: market[i].mode,
-            lastMode: market[i].mode,
-            lastDur: market[i].dur,
-            unchangedDur: 0,
-            dropCount: 0,
-            riseCount: 0,
-            profit: 0,
-            someSold: false,
-            someBought: false,
-        });
-    }
-    stockList.Start = Date.now() + 500;
-    stockList.lastTime = Date.now() + 500;
-    stockList.startingProfits = 0;
-    stockList.Profits = 0;
-    stockList.netProfits = 0;
-    stockList.grossProfits = 0;
-    stockList.grossLosses = 0;
-    stockList.totalStocks = 0;
-    stockList.totalShares = 0;
-    stockList.totalValue = 0;
-    stockList.unrealizedProfits = 0;
-    stockList.profitableStocks = 0;
-    stockList.unprofitableStocks = 0;
-    stockList.profitableTrades = 0;
-    stockList.unprofitableTrades = 0;
-    stockList.Purchases = 0;
-    stockList.Sales = 0;
-    stockList.Uptime = 0;
-    stockList.hourlyProfits = 0;
-    stockList.dailyProfits = 0;
-    stockList.minCookies = Number.MAX_VALUE;
-    stockList.maxCookies = 0;
-    stockList.noModActions = true;
-    stockList.Amount = 0;
-    for (i = 0; i < stockerModeProfits.length; i++)
-        for (j = 0; j < stockerModeProfits[i].length; j++)
-            for (k = 0; k < stockerModeProfits[i][j].length; k++)
-                stockerModeProfits[i][j][k] = 0;
-    if (CookiStocker._tickTimeout) {
-        clearTimeout(CookiStocker._tickTimeout);
-        CookiStocker._tickTimeout = 0;
-    }
-    if (CookiStocker._reportTimeout) {
-        clearTimeout(CookiStocker._reportTimeout);
-        CookiStocker._reportTimeout = 0;
-    }
-    if (hard) {
-        stockerMarketOn = true;
-        stockList.origCookiesPsRawHighest = 0;
-        Game.Achievements['Plasmic assets'].won = 0;
-        Game.Achievements['Bose-Einstein Condensed Assets'].won = 0;
-    }
-}
