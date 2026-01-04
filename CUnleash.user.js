@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CUnleash Custom Version
 // @namespace    http://tampermonkey.net/
-// @version      7.2-C
+// @version      7.3-C
 // @description  Unleash your cookie potential.
 // @author       petar105, n0eL1405
 // @match        https://orteil.dashnet.org/cookieclicker/
@@ -95,14 +95,20 @@ var autoPopTwelveth = setInterval(function() {
     }
 }, 60000);
 
+const timeout = 400;
+
+setTimeout(function () {
+    Game.LoadMod("https://klattmose.github.io/CookieClicker/SteamMods/CCSE/main.js")
+}, timeout);
+
 setTimeout(function() {
     Game.LoadMod("https://cookiemonsterteam.github.io/CookieMonster/dist/CookieMonster.js");
-}, 400); // Don't load Cookie Monster parallel with the game, CM loads but the game gets stuck
+}, timeout*2); // Don't load Cookie Monster parallel with the game, CM loads but the game gets stuck
 
 setTimeout(function() {
     Game.LoadMod("https://rawgit.com/yannprada/cookie-garden-helper/master/cookie-garden-helper.js");
-}, 800); // Same goes for Cookie Garden Helper
+}, timeout*3); // Same goes for Cookie Garden Helper
 
 setTimeout(function() {
     Game.LoadMod("https://raw.githubusercontent.com/n0eL1405/CookieClickerScripts/refs/heads/main/CookieStocker.js?token=GHSAT0AAAAAADLUBVKFTYK3FGZ73VKID4UI2K2O3PQ"); // Token weil es ein Privates Repo ist
-}, 1200);
+}, timeout*4);
