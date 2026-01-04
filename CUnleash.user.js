@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CUnleash Custom Version
 // @namespace    http://tampermonkey.net/
-// @version      7.4.4-C
+// @version      7.4.5-C
 // @description  Unleash your cookie potential.
 // @author       petar105, n0eL1405
 // @match        https://orteil.dashnet.org/cookieclicker/
@@ -123,6 +123,18 @@ setTimeout(function () {
 /*setTimeout(function () {
     Game.LoadMod("https://raw.githubusercontent.com/n0eL1405/CookieClickerScripts/refs/heads/main/CookieStocker.js");
 }, timeout * 4);*/
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // ========= CookiStocker =========
@@ -1939,4 +1951,4 @@ Game.registerMod('CookiStocker', {
             }
         }, stockerLoopFrequency);
     },
-})
+}, timeout*4)
