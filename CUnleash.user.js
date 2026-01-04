@@ -110,5 +110,5 @@ setTimeout(function() {
 }, timeout*3); // Same goes for Cookie Garden Helper
 
 setTimeout(function() {
-    Game.LoadMod("https://raw.githubusercontent.com/n0eL1405/CookieClickerScripts/refs/heads/main/CookieStocker.js?token=GHSAT0AAAAAADLUBVKFTYK3FGZ73VKID4UI2K2O3PQ"); // Token weil es ein Privates Repo ist
+    Game.LoadMod("https://raw.githubusercontent.com/n0eL1405/CookieClickerScripts/refs/heads/main/CookieStocker.js");
 }, timeout*4);
